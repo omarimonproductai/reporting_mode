@@ -32,6 +32,7 @@ jobs:
 
       - name: Scan and dispatch due briefs
         env:
+          DEFAULT_MODE_ACCOUNT: ${{ secrets.DEFAULT_MODE_ACCOUNT }}
           MODE_TOKEN: ${{ secrets.MODE_TOKEN }}
           MODE_SECRET: ${{ secrets.MODE_SECRET }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
