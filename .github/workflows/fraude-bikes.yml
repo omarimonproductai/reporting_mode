@@ -21,10 +21,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Fraude Bikes analysis
+      - name: Run Fraude Bikes brief
         env:
           MODE_TOKEN: ${{ secrets.MODE_TOKEN }}
           MODE_SECRET: ${{ secrets.MODE_SECRET }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: python scripts/fraude_bikes_analysis.py
+        run: python scripts/executor.py briefs/fraude-bikes-unit-economics.yml

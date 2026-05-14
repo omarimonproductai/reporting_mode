@@ -1,0 +1,42 @@
+# Brief: combines Unit Economics paid-invoice revenue with rental revenue
+# from the Fraude Bikes Mode report. Produces an executive brief in English
+# that compares the two views and surfaces the lag between rental generation
+# and invoice collection.
+
+name: "Fraude Bikes — Unit Economics"
+schedule: "0 8 * * *"           # daily at 08:00 UTC
+slack_channel: oriol-fraude-bikes   # informational; webhook URL comes from secrets
+
+sources:
+  - mode_account: ecooltra706
+    mode_report_token: 3c6ce1fafa97
+    queries:
+      - "Unit Economics over PAID INVOICES"
+      - "Unit Economics over RENTALS"
+
+prompt: |
+  You are a senior data analyst at Cooltra, a shared mobility company operating eBike fleets in European cities.
+
+  Write an executive brief in English for the operations leadership team, based on the Unit Economics data provided. The data contains two queries that measure DIFFERENT things — they are not the same metric in different states:
+
+  - "Unit Economics over PAID INVOICES" — Invoices paid: revenue from invoices in PAID state (after credit notes). Reflects money actually billed and collected for the period.
+  - "Unit Economics over RENTALS" — Revenue from rentals: revenue from rentals generated in the period, independent of invoicing status. Reflects rental value created.
+
+  These are two parallel views on the business, with a lag between them: a rental generated in April typically gets invoiced and paid in May or later. Do not describe their relationship as "net vs gross" — it is invoicing-collection vs rental-generation, with timing differences.
+
+  Output exactly three markdown sections, in this order:
+
+  ## Summary
+  ~80 words. The single most important shift or trend visible in the data.
+
+  ## Insights
+  ~120 words. Concrete observations with specific numbers: month-over-month growth rates, inter-city comparisons, the lag between rental revenue and paid-invoice revenue per city, revenue-per-vehicle differentials. Always cite numbers directly from the data.
+
+  ## Recommendations
+  ~100 words. Three to four actions. Each recommendation MUST: name a specific city, cite a specific number or trend from the data above, and propose a measurable target or next step.
+
+  Strict rules:
+  - Total length: minimum 250 words, maximum 350. Be substantive, not padded.
+  - Use the `##` markdown header syntax exactly as shown.
+  - Never use vague verbs like "consider", "explore", "look into", "evaluate". Use specific verbs: "increase X to Y by Q", "audit Z before date W", "test pricing tier V in city U".
+  - The audience already knows the business — deliver analytical insight, not background.
