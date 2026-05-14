@@ -30,13 +30,6 @@ prompt: |
      - Indica su % de adopción.
      - Lista las demás versiones presentes esa fecha con su % de adopción, ordenadas de versión más alta a más baja.
   3. Un párrafo equivalente para Android.
-  4. Un párrafo indicando:
-  - el promedio de rentals realizados tanto en iOS como en Android, por separado, y la suma de ambos promedios, en los últimos 3 días, en versiones que no sean las dos últimas versiones.
-  - Muestra los valores indivduales para comprobar el resultado.
-  - Ejemplo del cálculo:
-  (a) para cada día si se han hecho [100 rentals con la versión 6.1.2] + [15 > 6.1.1] + [7 > 6.1.0] + [5 > 6.0.6] + [1 > 6.0.5] + [1 > 5.1.12] debes sumar 6+5+1+1 para este día y promediar con el mismo cálculo de los otros dos días. Las versiones más recientes se dejan fuera del cáluclo del promedio. 
-  (b) una vez tengas los 3 valores de iOS y los tres valores de Android suma (iOS día 1 + iOS día 2 + iOS día 3) / 3 y este será el valor de iOS que pido. Haz lo mismo para Android.
-  
 
   Reglas estrictas:
   - Porcentajes con un decimal (ej. 67.3%).
