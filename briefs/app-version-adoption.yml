@@ -5,7 +5,7 @@
 name: "App Version Adoption"
 schedule: "0 10 * * *"          # daily at 10:00 local Cooltra time
 timezone: "Europe/Madrid"        # interpret schedule in Madrid local time (handles DST)
-slack_channel: oriol-fraude-bikes
+slack_channel: test-github-oriol
 csv: true                        # attach raw query data as CSV thread reply
 
 sources:

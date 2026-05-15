@@ -5,7 +5,7 @@
 
 name: "Fraude Bikes — Unit Economics"
 schedule: "0 8 * * *"           # daily at 08:00 UTC
-slack_channel: oriol-fraude-bikes
+slack_channel: test-github-oriol
 csv: true                        # attach raw query data as CSV thread reply
 
 sources:
