@@ -2,7 +2,9 @@
 
 Reads a brief YAML config, triggers each required Mode report, fetches the
 specified queries from each, composes a single LLM prompt with all the data,
-generates an executive brief, and posts it to Slack via incoming webhook.
+generates an executive brief, and posts it to Slack via Bot Token API
+(chat.postMessage), optionally attaching the raw data as CSV files in a
+thread reply (files_upload_v2) when the brief has `csv: true`.
 
 Usage:
     python scripts/executor.py briefs/<brief>.yml
@@ -10,13 +12,17 @@ Usage:
 The brief YAML schema (see briefs/*.yml for examples):
     name: str
     schedule: cron string                (read by due_runner.py, ignored here)
-    slack_channel: str                   (informational; webhook URL from env)
+    timezone: IANA tz name               (optional; used by due_runner.py)
+    slack_channel: str                   (target channel for chat.postMessage)
+    csv: bool                            (optional; if true, attach raw CSVs)
     sources:
-      - mode_account: str
+      - mode_account: str                (optional; falls back to env var)
         mode_report_token: str
-        queries: [str, ...]
+        queries: [token, ...]            (12-char Mode query tokens)
     prompt: str                          (multiline, inline)
 """
+import csv as csv_module
+import io
 import json
 import os
 import re
@@ -29,6 +35,7 @@ import requests
 import yaml
 from dotenv import load_dotenv
 from groq import Groq
+from slack_sdk import WebClient
 
 load_dotenv()
 
@@ -49,7 +56,7 @@ LLM_MAX_TOKENS = 800
 LLM_TIMEOUT = 60
 
 # ---- Slack ----
-SLACK_TIMEOUT = 10
+SLACK_TIMEOUT = 10  # seconds, applied to chat.postMessage and files.upload
 
 OUT_DIR = Path(__file__).resolve().parent.parent / "out"
 
@@ -282,18 +289,78 @@ def markdown_to_slack(text):
     return text
 
 
-def send_to_slack(brief_name, brief_text):
-    webhook = os.environ.get("SLACK_WEBHOOK_URL")
-    if not webhook:
-        sys.exit("ERROR: SLACK_WEBHOOK_URL no definit.")
+def get_slack_client():
+    token = os.environ.get("SLACK_BOT_TOKEN")
+    if not token:
+        sys.exit("ERROR: SLACK_BOT_TOKEN no definit. Comprova .env (local) "
+                 "o secrets (CI).")
+    return WebClient(token=token, timeout=SLACK_TIMEOUT)
+
+
+def rows_to_csv(rows):
+    """Serialise a list of dicts to CSV text.
+
+    Returns empty string for empty input. Column order is taken from the
+    first row's keys. Extra keys in later rows are silently dropped (defensive
+    against mismatched schemas).
+    """
+    if not rows:
+        return ""
+    buffer = io.StringIO()
+    writer = csv_module.DictWriter(
+        buffer,
+        fieldnames=list(rows[0].keys()),
+        extrasaction="ignore",
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    return buffer.getvalue()
+
+
+def slugify_for_filename(text):
+    return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_") or "data"
+
+
+def post_brief_to_slack(brief, sources_data, brief_text):
+    """Post the brief to Slack and optionally attach CSVs as a thread reply.
+
+    Uses chat.postMessage for the main message (Bot Token required) and
+    files_upload_v2 for the CSV attachments.
+    """
+    channel = brief.get("slack_channel")
+    if not channel:
+        sys.exit("ERROR: el brief no té camp 'slack_channel'.")
+
+    client = get_slack_client()
     formatted = markdown_to_slack(brief_text)
     today_str = date.today().strftime("%d/%m/%Y")
-    body = f"📊 *{brief_name} — {today_str}*\n\n{formatted}"
-    response = requests.post(
-        webhook, json={"text": body}, timeout=SLACK_TIMEOUT,
-    )
-    response.raise_for_status()
-    return response.status_code
+    body = f"📊 *{brief['name']} — {today_str}*\n\n{formatted}"
+
+    print(f"-> Postejant a #{channel}...")
+    response = client.chat_postMessage(channel=channel, text=body)
+    thread_ts = response["ts"]
+    print(f"   ✓ missatge postejat (ts={thread_ts})")
+
+    if not brief.get("csv"):
+        return
+
+    today_iso = date.today().isoformat()
+    print("-> Pujant CSVs com a thread replies...")
+    for source, title, results in sources_data:
+        for query_name, rows in results.items():
+            if not rows:
+                print(f"   - {query_name}: 0 files, omès")
+                continue
+            csv_content = rows_to_csv(rows)
+            filename = f"{slugify_for_filename(query_name)}_{today_iso}.csv"
+            client.files_upload_v2(
+                channel=channel,
+                thread_ts=thread_ts,
+                content=csv_content,
+                filename=filename,
+                title=query_name,
+            )
+            print(f"   ✓ {filename} ({len(rows)} files)")
 
 
 def save_artifacts(brief, sources_data, brief_text):
@@ -350,9 +417,7 @@ def main():
     print("=" * 70)
     print("")
 
-    print(f"-> Enviant a Slack...")
-    status = send_to_slack(brief["name"], brief_text)
-    print(f"   ✓ enviat (status {status})")
+    post_brief_to_slack(brief, sources_data, brief_text)
 
 
 if __name__ == "__main__":
