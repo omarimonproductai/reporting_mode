@@ -46,58 +46,73 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
 9. The application MUST allow the user to add and remove **sources** dynamically (rows of the form).
 10. For each query within a source, the application MUST allow the user to **enable or disable CSV attachment to Slack** independently (this replaces the current per-brief `csv` flag). The default is `false`.
 
+### Slack Channel Selection
+
+11. The `slack_channel` field MUST be a **searchable dropdown** populated from a live list of Slack workspace channels (the option list comes from the Slack API at runtime; details in §7).
+12. The dropdown MUST allow **typeahead search** to filter by channel name. When the list exceeds ~10 entries, search becomes the primary discovery affordance.
+13. By default, the dropdown options MUST be **only channels where the bot is currently a member** (so the user picks among valid destinations without thinking about invites).
+14. The user MUST still be allowed to **type a channel name that is not in the dropdown** (e.g., a channel created moments ago, or one where the bot was just invited). The save action does NOT block on dropdown membership.
+15. When the user selects (or types) a channel where the bot is NOT currently a member, the platform MUST display a **non-blocking inline warning** below the field, containing:
+    - A clear explanation that the bot must be in the channel to publish.
+    - A code snippet `/invite @<bot-name>` with a **"Copy" button** that puts it on the user's clipboard.
+    - A subtle "Refresh" link that re-queries the channel list (so once the user invites the bot, they can confirm and dismiss the warning without page reload).
+16. A **"Refresh channels" affordance** (icon button next to the dropdown) MUST force-bust the server-side channel cache and re-render the list. This handles the case where an admin invites the bot to a new channel and wants to see it appear immediately.
+17. **Save MUST always proceed** even when the warning is shown — the user has been informed of the consequence. Runtime delivery will fail loudly with the existing executor error path if the bot is still not in the channel at execution time.
+
 ### Schedule Editor
 
-11. The schedule MUST be set through a **visual builder** (no raw cron typing required in the default flow). The builder allows the user to specify:
+18. The schedule MUST be set through a **visual builder** (no raw cron typing required in the default flow). The builder allows the user to specify:
     - The frequency: every day, specific days of the week, specific day of the month, or every N hours.
     - The time(s) of day (HH:MM, in 15-minute increments).
     - The timezone (default: `Europe/Madrid`).
-12. The visual builder MUST emit a **valid cron expression** persisted to the YAML, plus a human-readable description shown to the user (e.g., "Cada dimarts a les 10:00 hora local Cooltra").
-13. The visual builder MAY include a small "Advanced: edit cron directly" toggle for power users; this is a stretch goal, not a v1 requirement.
+19. The visual builder MUST emit a **valid cron expression** persisted to the YAML, plus a human-readable description shown to the user (e.g., "Cada dimarts a les 10:00 hora local Cooltra").
+20. The visual builder MAY include a small "Advanced: edit cron directly" toggle for power users; this is a stretch goal, not a v1 requirement.
 
 ### Per-Brief Execution Metadata
 
-14. The detail view MUST display, prominently and above the editable form:
+21. The detail view MUST display, prominently and above the editable form:
     - The **timestamp** of the last execution (in local Cooltra time, with a tooltip showing the UTC original).
     - The **status** of the last execution (success / failed / never run), color-coded.
     - The **tokens consumed** in that last execution, split as **input** and **output** if available, otherwise total.
-15. If the brief has never run, the section MUST display "Mai executat" (or equivalent) rather than empty.
+22. If the brief has never run, the section MUST display "Mai executat" (or equivalent) rather than empty.
 
 ### Calendar View
 
-16. The calendar view MUST display a **weekly grid** (Monday → Sunday columns, 24h rows or compressed by hour blocks) showing every scheduled brief as a colored event at its scheduled time.
-17. Clicking an event MUST open the corresponding brief's detail view.
-18. The calendar MUST handle timezones correctly: events are drawn at the time they actually fire in `Europe/Madrid` (the operational timezone of Cooltra), regardless of the brief's own declared timezone.
-19. A toggle MAY allow switching between weekly and monthly views (stretch goal).
+23. The calendar view MUST display a **weekly grid** (Monday → Sunday columns, 24h rows or compressed by hour blocks) showing every scheduled brief as a colored event at its scheduled time.
+24. Clicking an event MUST open the corresponding brief's detail view.
+25. The calendar MUST handle timezones correctly: events are drawn at the time they actually fire in `Europe/Madrid` (the operational timezone of Cooltra), regardless of the brief's own declared timezone.
+26. A toggle MAY allow switching between weekly and monthly views (stretch goal).
 
 ### Persistence & Synchronization
 
-20. **Reads** of brief content MUST come from the canonical source: the `briefs/*.yml` files in this repository, fetched via the GitHub API.
-21. **Writes** (create, update, delete a brief) MUST go through a **serverless backend endpoint** that uses the GitHub API to commit the change to the `main` branch of this repository.
-22. The commit author for changes made through the platform MUST be a service identity (e.g., `cooltra-reporting-bot`), with a commit message that describes the change (e.g., `Update brief: app-version-adoption`).
-23. After a successful write, the platform MUST display a confirmation toast and the new state of the brief MUST be reflected in the UI within 5 seconds (after the API returns).
-24. Concurrent edits to the same brief MUST be detected (compare the commit SHA the user started from with the current SHA); a conflict MUST be reported with a "your version vs the current version" comparison.
+27. **Reads** of brief content MUST come from the canonical source: the `briefs/*.yml` files in this repository, fetched via the GitHub API.
+28. **Writes** (create, update, delete a brief) MUST go through a **serverless backend endpoint** that uses the GitHub API to commit the change to the `main` branch of this repository.
+29. The commit author for changes made through the platform MUST be a service identity (e.g., `cooltra-reporting-bot`), with a commit message that describes the change (e.g., `Update brief: app-version-adoption`).
+30. After a successful write, the platform MUST display a confirmation toast and the new state of the brief MUST be reflected in the UI within 5 seconds (after the API returns).
+31. Concurrent edits to the same brief MUST be detected (compare the commit SHA the user started from with the current SHA); a conflict MUST be reported with a "your version vs the current version" comparison.
 
 ### Execution Tracking
 
-25. Each execution of a brief by GitHub Actions MUST publish a small JSON artifact containing: brief name, start time, end time, status, input tokens, output tokens, and any error message.
-26. The web app MUST read these artifacts via the GitHub Actions API to render the per-brief execution metadata (§4.14).
-27. If the latest artifact is older than 95 days (GitHub's retention limit), the application MUST display "Cap execució recent registrada" gracefully.
+32. Each execution of a brief by GitHub Actions MUST publish a small JSON artifact containing: brief name, start time, end time, status, input tokens, output tokens, and any error message.
+33. The web app MUST read these artifacts via the GitHub Actions API to render the per-brief execution metadata (§4.21).
+34. If the latest artifact is older than 95 days (GitHub's retention limit), the application MUST display "Cap execució recent registrada" gracefully.
 
 ### Footer / Version Information
 
-28. The application MUST display, **discretely** at the bottom of every page (in a small footer in muted color), the short SHA and message of the latest commit on `main`, plus the timestamp of that commit converted to **local Cooltra time** (Europe/Madrid).
-29. This footer information MUST come from the GitHub API at page load time.
+35. The application MUST display, **discretely** at the bottom of every page (in a small footer in muted color), the short SHA and message of the latest commit on `main`, plus the timestamp of that commit converted to **local Cooltra time** (Europe/Madrid).
+36. This footer information MUST come from the GitHub API at page load time.
 
 ### Schema Migration
 
-30. The existing briefs (`briefs/fraude-bikes-unit-economics.yml`, `briefs/app-version-adoption.yml`) MUST be migrated to the new schema where `csv` lives at the query level rather than the brief level. The migration is one-time and committed as part of the rollout.
+37. The existing briefs (`briefs/fraude-bikes-unit-economics.yml`, `briefs/app-version-adoption.yml`) MUST be migrated to the new schema where `csv` lives at the query level rather than the brief level. The migration is one-time and committed as part of the rollout. **The `slack_channel` field stays at the brief level** (no per-query channel override in this version — see Non-Goals).
 
 ## 5. Non-Goals (Out of Scope)
 
 - **Authentication and per-user briefs**. The platform is openly accessible; everyone sees and edits everything. The data model includes a nullable `owner_email` field reserved for a future auth phase but it is never populated in this version.
 - **Migration from YAML files to a database**. Briefs remain YAML in the repository for this version.
-- **Slack channel management per brief**. The `slack_channel` field is editable but the actual delivery still flows through the single Slack Bot Token configured in GitHub Secrets.
+- **Per-query Slack channel override**. Within a single brief, all queries publish to the same channel (the brief's `slack_channel`). If you need different destinations for different queries, create separate briefs.
+- **Channel metadata in the dropdown** (description, member count, last brief posted there, last activity). The dropdown shows only channel name and a public/private icon; richer metadata is a future iteration.
+- **Auto-inviting the bot to a channel from the platform**. The platform tells the user the `/invite` command to run in Slack themselves; it never invites on the user's behalf (would require additional bot scopes and admin approval).
 - **LLM model selection per brief**. The Groq model remains hardcoded in the executor (`llama-3.3-70b-versatile`). Adding per-brief model selection is a future improvement.
 - **Real-time updates**. The platform polls on page load and on user actions; it does not push updates via WebSockets or Server-Sent Events.
 - **Mobile-first UI**. The application is responsive but designed primarily for desktop use; mobile may have a degraded experience for the calendar view.
@@ -111,6 +126,8 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
 - **Sidebar width**: ~280px on desktop. On screens narrower than `lg` (1024px), the sidebar collapses to a hamburger menu.
 - **Form fields with inline help**: each field renders as `<Label> + <Input> + <description below in small muted text>`. No expandable tooltips at first — just always-visible muted text. PLG philosophy: zero friction, zero hidden info.
 - **Cron visual builder**: standalone component, ~400px wide, with three sections: "Quan" (frequency: radio buttons), "A quina hora" (time picker, 15-min increments), "Zona horària" (dropdown defaulting to `Europe/Madrid`). A live preview below shows the human-readable schedule (e.g. "Cada dimarts a les 10:00 (Europe/Madrid)") and, in muted font, the generated cron expression.
+- **Slack channel selector**: shadcn/ui `Combobox` pattern — a button that opens a popover with a searchable list. Public channels show with a `#` icon; private channels show with a `🔒` icon. Channel names rendered in `font-mono` to match Slack's own visual convention. Empty state when the bot is in zero channels: a friendly message + the `/invite @<bot-name>` snippet.
+- **"Bot not in channel" warning**: renders below the channel field as a shadcn/ui `Alert` (warning variant — yellow/amber, not red, because the situation is recoverable). Inside: one line of explanation + a code block with the `/invite` snippet + a small "Copy" button that triggers a transient "Copiat!" toast. A subtle "Refresh channels" link to re-query the list after the user invites the bot.
 - **Calendar event color**: derive deterministically from the brief name (so each brief has a consistent color across the calendar regardless of who sees it).
 - **Footer**: 12px text, `text-zinc-400`, fixed bottom-right corner with `padding 8px 12px`. Format: `Built from <sha7> · <commit subject truncated to 50 chars> · <DD/MM/YYYY HH:MM Madrid>`.
 
@@ -135,6 +152,13 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
   - `GET /api/version`: returns the latest commit sha, subject, and timestamp.
 - **GitHub authentication**: a service GitHub App or PAT stored in Vercel environment variables. The PAT scopes: `contents:write` on this repository only.
   - *Note*: never expose this PAT client-side. All GitHub API calls go through the server.
+
+### Slack channel discovery
+- New API endpoint `GET /api/channels`: server-side calls Slack `conversations.list` with `types=public_channel,private_channel`, filters where `is_member: true`, and returns `[{name, is_private}]`. Strips out everything else.
+- **Additional bot OAuth scopes required**: `channels:read` (public channels) and `groups:read` (private channels). Adding these requires reinstalling the Slack app and likely re-approval from the workspace admin. Document this clearly in the migration runbook for this version.
+- **Caching**: in-memory cache with 5-minute TTL, keyed globally (no auth yet → no per-user cache). The "Refresh channels" UI affordance hits `GET /api/channels?force=true` to bust the cache.
+- **Rate limit awareness**: `conversations.list` is Slack Tier 2 (~20 req/min). With 5-minute caching, even sustained UI usage stays well within limits.
+- **Pagination**: Slack returns up to 200 channels per call with cursor pagination. The endpoint must follow the cursor until exhausted. Cooltra's workspace is unlikely to exceed 200 channels the bot is in, but the implementation should be correct from day 1.
 
 ### Cron visual builder → cron string
 - Output canonical 5-field cron strings (`m h dom mon dow`).
@@ -179,6 +203,7 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
 - **Cost**: monthly infrastructure cost remains 0 € for at least 90 days post-launch, with up to 20 briefs and 100 user sessions per day.
 - **Reliability**: at least 99% of writes succeed (commit lands on `main` and is reflected in the UI) when measured over a rolling 30-day window.
 - **Support load**: zero "how do I…" questions arrive to the engineering team that are answered by information already visible in the inline help texts.
+- **Channel-misconfiguration runtime failures**: at most 1 per month after launch. Users either pick a valid channel from the dropdown or follow the inline `/invite` snippet — they should not be discovering "bot not in channel" through a Slack delivery error.
 
 ## 9. Open Questions
 
@@ -188,3 +213,5 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
 4. **Brief deletion confirmation**: do we require a typed confirmation (typing the brief name) for delete, or just a "Are you sure?" modal? Lean toward the modal only — deletion is reversible from git history.
 5. **Empty calendar state**: when no briefs are scheduled in the current week, show an illustration + CTA "Create your first brief" or just an empty grid?
 6. **Visualisation of token consumption over time**: nice-to-have for a future iteration. Not in this PRD's scope, but the artifact data captured here enables it.
+7. **DM-style destinations**: the `slack_channel` field accepts a channel name. Should we also support direct messages (`@username`) or multi-person DMs as destinations? Out of scope today, but the schema (single string) doesn't preclude it. Decide before implementation if such use cases exist.
+8. **Migrating "fully-private" channels**: if Cooltra later wants briefs to publish to channels where the bot's `groups:read` is disabled by workspace policy, what's the fallback? Most likely: those channels don't appear in the dropdown and the user must type them manually + trigger the warning flow. Validate this assumption with workspace admin.
