@@ -339,7 +339,10 @@ def post_brief_to_slack(brief, sources_data, brief_text):
     print(f"-> Postejant a #{channel}...")
     response = client.chat_postMessage(channel=channel, text=body)
     thread_ts = response["ts"]
-    print(f"   ✓ missatge postejat (ts={thread_ts})")
+    # Slack returns the resolved channel ID even when we pass a channel name.
+    # files_upload_v2 (via files.completeUploadExternal) only accepts IDs.
+    channel_id = response["channel"]
+    print(f"   ✓ missatge postejat (channel_id={channel_id}, ts={thread_ts})")
 
     if not brief.get("csv"):
         return
@@ -354,7 +357,7 @@ def post_brief_to_slack(brief, sources_data, brief_text):
             csv_content = rows_to_csv(rows)
             filename = f"{slugify_for_filename(query_name)}_{today_iso}.csv"
             client.files_upload_v2(
-                channel=channel,
+                channel=channel_id,
                 thread_ts=thread_ts,
                 content=csv_content,
                 filename=filename,
