@@ -210,6 +210,12 @@ T4. Adding the Run Now button requires extending the platform's GitHub PAT scope
 - Use a small open-source library if helpful (e.g., `cron-builder`) or build a minimal custom function. The output must round-trip: reading a cron from YAML should be displayable back in the builder.
 - Time validation: only allow `:00`, `:15`, `:30`, `:45` minutes to keep the UI simple. If a brief has a cron from outside this grid (e.g., `7 8 * * *`), the builder shows it as "Custom" and allows raw editing.
 
+### Scheduling reliability (known limitation)
+- The master scheduler workflow (`.github/workflows/run-due-briefs.yml`) runs on cron `*/15 * * * *` (UTC) and `due_runner.py` uses a matching 15-minute window so each scheduled brief fires exactly once per period.
+- **Limitation**: GitHub Actions free-tier `schedule` triggers are best-effort and frequently delayed by 5–30 minutes (worst case longer). If the delay for a given tick exceeds the 15-minute window, that scheduled execution is **lost** — the next scanner tick will see the brief as out-of-window and won't fire it (the brief returns to its normal cadence at the next scheduled time).
+- **Why we don't fix it in this version**: making the window wider re-introduces duplicate runs; making the cron more frequent (e.g. `*/5`) reduces the safe window proportionally and gives no real benefit. The robust fix needs persistent per-brief "last fired at" state (a state file in the repo, or an external KV), which is significant added complexity for an internal tool with daily-ish briefs.
+- **Mitigation**: task 6.0's `Run Now` button doubles as the user-facing recovery path. If a scheduled execution doesn't arrive in Slack within a sensible margin (e.g. 30 min after the planned time), the user opens the brief and clicks Run Now to dispatch it manually. The 2-minute cooldown still applies. A future iteration could surface a banner ("This brief should have run at 13:25 — click Run Now to recover") on the detail view when a scheduled run is detected as missed; not in scope today.
+
 ### Execution tracking
 - Modify `scripts/executor.py` to write a JSON file `out/<brief-slug>.run.json` per execution, containing:
   ```json
