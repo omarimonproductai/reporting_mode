@@ -1,0 +1,11 @@
+name: Nom del brief
+schedule: 0 8 * * *
+timezone: Europe/Madrid
+slack_channel: test-github-oriol
+sources:
+  - mode_report_token: 7b89f8a2f8d8
+    queries:
+      - token: 4c71991707f0
+        csv: true
+prompt: Prova de creació d'un brief
+owner_email: null

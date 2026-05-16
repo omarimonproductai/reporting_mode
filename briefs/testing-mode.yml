@@ -1,0 +1,10 @@
+name: Testing mode
+schedule: 0 8 * * *
+slack_channel: test-github-oriol
+sources:
+  - mode_report_token: 7b89f8a2f8d8
+    queries:
+      - token: 4c71991707f0
+        csv: true
+prompt: segueixo provant
+owner_email: null
