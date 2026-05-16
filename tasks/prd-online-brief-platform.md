@@ -40,12 +40,17 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
 
 ### Brief List & Detail View
 
-6. The main content area for a brief MUST present every field of the brief as an editable form: `name`, `schedule`, `slack_channel`, list of `sources` (each with `mode_report_token` and list of queries — each query being `{token, csv}`), and `prompt`. The `timezone` field has been removed from the data model; the company runs in a single TZ (`Europe/Madrid`, displayed as "Catalunya") hardcoded in the Python scheduler.
+6. The main content area for a brief MUST present every field of the brief as an editable form: `name`, `schedule`, `slack_channel`, optional `reference_link` (URL appended to the Slack message), list of `sources` (each with `mode_report_token` and list of queries — each query being `{token, csv}`), and `prompt`. The `timezone` field has been removed from the data model; the company runs in a single TZ (`Europe/Madrid`, displayed as "Catalunya") hardcoded in the Python scheduler.
 7. **Each field MUST have an adjacent inline description** explaining what the field is for, the expected format, and a concrete example. The description MAY be expanded/collapsed but is visible by default for a new user (PLG: no onboarding needed).
 8. The `prompt` field MUST be a multi-line text area with monospace font and visible line wrapping, sized to comfortably show ~20 lines without scrolling.
 9. The application MUST allow the user to add and remove **sources** dynamically (rows of the form).
 10. For each query within a source, the application MUST allow the user to **enable or disable CSV attachment to Slack** independently (this replaces the current per-brief `csv` flag). The default is `false`.
 10a. **Early-data freshness warning** (added 2026-05-16): when the user opens a brief detail view before **10:00 local Catalunya time**, the platform MUST display a non-blocking amber Alert above the ExecutionMetadata card with the message: «Les dades de la gran majoria de reports s'agafen del repositori diari i pot ser que abans de les 10:00 del matí encara no s'hagi completat el volcat de dades. Si això passés, estaries mirant dades amb un dia de delay.» Rationale: the upstream Mode data pipeline finishes its daily dump around 10:00, so any LLM brief generated earlier may reflect yesterday's snapshot. The check uses `Intl.DateTimeFormat({timeZone: "Europe/Madrid"})` and runs client-side after mount; the warning disappears automatically from 10:00 onwards.
+10b. **Reference link** (added 2026-05-16): each brief MUST have an optional `reference_link` field — a URL surfaced in the Slack message so recipients can click through to the original data source / additional context. UI rules:
+    - Optional input (no asterisk) inside the Outputs section, below Slack Channel.
+    - Validation: empty OR a string starting with `http://` / `https://`.
+    - YAML: emitted only when non-empty.
+    - Slack rendering: when present, the executor appends a new line at the end of the message body in the form `🔗 <URL|Reference link>` (Slack mrkdwn syntax for a labelled clickable link). When absent, nothing is appended.
 
 ### Slack Channel Selection
 
@@ -116,6 +121,10 @@ T4. Adding the Run Now button requires extending the platform's GitHub PAT scope
 
 37. The existing briefs (`briefs/fraude-bikes-unit-economics.yml`, `briefs/app-version-adoption.yml`) MUST be migrated to the new schema where `csv` lives at the query level rather than the brief level. The migration is one-time and committed as part of the rollout. **The `slack_channel` field stays at the brief level** (no per-query channel override in this version — see Non-Goals).
 
+### Mode space catalog (future requirement)
+
+38. The `mode_report_token` and `queries[].token` form fields MUST eventually be replaced by name-based comboboxes populated from the Cooltra Mode space (`https://app.mode.com/ecooltra706/spaces/9d367a761ba1`). The user picks reports / queries by their human-readable name; the YAML still stores the underlying tokens. Implementation tracked as task 8.0; deferred for now. The current free-text inputs remain functional as the fallback path even after the comboboxes ship (Mode API down / token not in catalog / etc.).
+
 ## 5. Non-Goals (Out of Scope)
 
 - **Authentication and per-user briefs**. The platform is openly accessible; everyone sees and edits everything. The data model includes a nullable `owner_email` field reserved for a future auth phase but it is never populated in this version.
@@ -145,12 +154,13 @@ T4. Adding the Run Now button requires extending the platform's GitHub PAT scope
 - **Help-text affordance**: every form field exposes its explanation behind a small **Info icon next to the label**. Hover (or keyboard focus) opens a shadcn Tooltip with the help text; on touch devices a tap toggles it. Originally implemented as a click-triggered shadcn Popover during 2.0; switched to Tooltip after user feedback that the icon felt empty on hover. Reason for hiding the help in the first place: when always-visible, the descriptions crowded the form visually. (Deviates from the original "no expandable tooltips" stance below, kept for history; the user revised the call after seeing 2.0 live.)
 - **Form layout: Brief Name above, Inputs section, Outputs section.** The detail view is structured as a single `Brief Name` field at the top (the brief's identity), followed by two bordered cards:
   - **Inputs** card — what the LLM ingests: the list of `Sources` (each one a Mode report plus its queries) and the `Prompt`.
-  - **Outputs** card — when and where the brief is published: `Schedule`, `Slack Channel`. (Time Zone is no longer surfaced; see the next bullet.)
+  - **Outputs** card — when and where the brief is published: `Schedule`, `Slack Channel`, and the optional `Reference link` (added 2026-05-16, rendered as a clickable line at the end of the Slack message). (Time Zone is no longer surfaced; see the next bullet.)
   This grouping was added after 2.0 user review to give users a mental model of the brief lifecycle (data in → LLM → message out) before they read any individual field.
 - **Canonical UI labels** (the chrome strings that appear on screen and that support / documentation must reference; the corresponding YAML keys are shown in parens — see §4.6 for the structural data model):
   - Brief Name (`name`)
   - Schedule (`schedule`)
   - Slack Channel (`slack_channel`)
+  - Reference link (`reference_link`, optional)
   - Sources (`sources[]`)
   - Mode report (`sources[].mode_report_token` — the "token" suffix is dropped from the label because it was jargon)
   - Queries (`sources[].queries[]`)

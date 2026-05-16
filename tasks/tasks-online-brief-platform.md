@@ -179,6 +179,7 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     - **Hourly frequency in CronBuilder**: new "Cada hora" option in the Frequency Select emits `MM * * * *`. The Time section hides the hour Select and switches its label to "Minute" when this kind is active. parseCron accepts `*` in the hour position when DOM and DOW are also `*`. humanize returns «Cada hora a les :MM».
     - **Sidebar name truncation**: long brief names truncate with an ellipsis (`min-w-0 flex-1 truncate`) instead of overflowing the 280px sidebar. Each row is wrapped in a shadcn Tooltip anchored `side="right"` that reveals the full name on hover.
     - **Early-data freshness warning** (`EarlyDataWarning.tsx`): client component mounted between the brief title and the ExecutionMetadata card on `/briefs/[name]`. Checks `Intl.DateTimeFormat({timeZone: "Europe/Madrid"})` for the current hour after mount and renders an amber `Alert` when hour < 10. Communicates that the daily Mode data dump may not be complete yet and the brief output could reflect yesterday's snapshot.
+    - **Reference link**: new optional `reference_link` field on briefs. UI: an optional URL input inside the Outputs section, below Slack Channel; validation is empty OR `http(s)://...`. Schema (`lib/schemas.ts`): always-present string field allowed to be empty. YAML (`lib/yaml.ts`): `serializeBrief` only emits the key when the value is a non-empty trimmed string. Executor (`scripts/executor.py:post_brief_to_slack`): when present, appends `\n\n🔗 <URL|Reference link>` to the message body so Slack mrkdwn renders it as a clickable labelled link. Empty / missing values produce no extra line.
   - [ ] 4.9 Implement `web/components/ExecutionMetadata.tsx`: a prominent card on the brief detail page (above the form) showing: large status indicator, absolute timestamp in Madrid time with tooltip showing UTC, separate "Input tokens" / "Output tokens" stats, and the error message in muted red if status=failed.
   - [ ] 4.10 Handle three edge cases gracefully:
     - **Never run** — show "Mai executat" instead of an empty card.
@@ -229,3 +230,30 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
   - [ ] 7.4 Add the second-locale catalog (likely `es.ts` for Castilian Spanish or `en.ts`; confirm with the user before translating).
   - [ ] 7.5 Add a locale switcher: a small dropdown in the sidebar footer or settings. Persist the choice in a cookie so the server can pick the right catalog on first paint.
   - [ ] 7.6 Verify on the Vercel preview: every localised string switches when the locale changes; chrome stays English in all locales; the «El _Slack channel_ és obligatori» / «El _Slack channel_ es obligatorio» / "_Slack channel_ is required" pattern works in all three.
+
+- [ ] **8.0 Mode space catalog (Report + Query pickers in BriefForm)** (new, added 2026-05-16 after user feedback — implementation deferred)
+
+  **Goal**: replace the free-text inputs for `mode_report_token` and `queries[].token` with comboboxes populated from the Cooltra Mode space at `https://app.mode.com/ecooltra706/spaces/9d367a761ba1`. Users pick reports / queries **by name**; the YAML still stores the underlying **tokens**. Cuts down on token-copy mistakes and surfaces the available reports without the user leaving the form.
+
+  **Approach** (option 1 from the user discussion): fetch the catalog from Mode on each page load, cached server-side for 5 minutes. No state committed to the repo. Option 2 (manual refresh + JSON in repo) was considered and rejected — see the discussion below.
+
+  - [ ] 8.1 **User action (cannot be coded)**: copy `MODE_TOKEN`, `MODE_SECRET`, `DEFAULT_MODE_ACCOUNT` from GitHub Secrets to Vercel env vars (Production + Preview). The Python executor has them; the web app doesn't yet.
+  - [ ] 8.2 Implement `web/lib/mode.ts` (server-only): typed HTTP wrappers that mirror the flow `scripts/executor.py:resolve_query_tokens` already uses. Two exported functions:
+    - `listSpaceReports(spaceId): Promise<{token: string, name: string}[]>` — `GET /api/{account}/spaces/{space}/reports` (paginate if needed).
+    - `listReportQueries(reportToken): Promise<{token: string, name: string}[]>` — `GET /api/{account}/reports/{report}/queries`.
+    Account resolution follows the same fallback as the executor (source-level → `DEFAULT_MODE_ACCOUNT` env var).
+  - [ ] 8.3 Implement `web/app/api/mode/space-catalog/route.ts`: `GET` returns `{reports: [{token, name, queries: [{token, name}]}]}` for the Cooltra space (id hardcoded to `9d367a761ba1` for now; can be promoted to an env var later). Module-level Map with 5-minute TTL; `?force=true` busts the cache. 502 on Mode API errors.
+  - [ ] 8.4 Implement `web/components/ReportCombobox.tsx`: shadcn Command + Popover. Trigger button shows the current report's NAME (and the token in a secondary muted line). Search filters by name. Free-text fallback when the catalog is unavailable.
+  - [ ] 8.5 Implement `web/components/QueryCombobox.tsx`: same pattern as ReportCombobox. **The query list is scoped to the currently-selected report** for that source — watched from RHF (`useWatch({name: \`sources.${sIdx}.mode_report_token\`})`). If the report value changes, the queries combobox resets / re-filters.
+  - [ ] 8.6 Wire into `BriefForm` / `SourceCard`:
+    - `mode_report_token` input → ReportCombobox (Controller-wrapped on the `sources.${idx}.mode_report_token` field).
+    - Each `queries[].token` input → QueryCombobox (Controller-wrapped on the `sources.${idx}.queries.${qIdx}.token` field; reads the parent source's `mode_report_token` to determine the available list).
+    - YAML output unchanged: still stores tokens.
+  - [ ] 8.7 Edge cases:
+    - **Saved token not in current catalog** (renamed / deleted at Mode): show the value with an amber badge "no és al catàleg actual"; allow keep + edit but warn the user.
+    - **Mode API down / 502**: fall back to a free-text input with a muted hint "Mode no disponible — escriu el token manualment".
+    - **Empty space (no reports)**: combobox shows an empty state with a link to the Mode space.
+    - **Report selected but its query list empty**: similar empty state for queries.
+  - [ ] 8.8 Manual verification on Vercel preview: open `/briefs/new` → Report combobox lists reports from the configured space; pick one → Queries combobox restricted to that report's queries; save → resulting YAML stores tokens only.
+
+  **Option 2 discussion (deferred / rejected for now)**: an alternative would be to expose a "Refresh Mode catalog" button that fetches the catalog and commits a `mode-catalog.json` to the repo, so subsequent reads avoid the Mode API entirely. ~25-35% more code (GitHub write path + refresh UI), zero runtime Mode calls, but adds a manual maintenance step (someone has to refresh when Mode changes) and creates bot-driven commits in git history. For Cooltra's scale (a few reports, internal team) option 1's 5-minute cache is sufficient and simpler.
