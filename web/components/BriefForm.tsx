@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -330,11 +330,17 @@ export function BriefForm(props: Props) {
     handleSubmit,
     reset,
     control,
-    formState: { errors },
+    trigger,
+    formState: { errors, isValid },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues,
+    mode: "onChange",
   });
+
+  useEffect(() => {
+    void trigger();
+  }, [trigger]);
 
   const sources = useFieldArray({ control, name: "sources" });
 
@@ -434,37 +440,46 @@ export function BriefForm(props: Props) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-zinc-400">
-          {isCreate
-            ? "Nou brief"
-            : `Carregat a ${formatLoadedAt(props.loadedAt)}`}
-        </div>
-        {mode === "view" ? (
-          <Button type="button" size="sm" variant="outline" onClick={enterEdit}>
-            Edit
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={cancelEdit}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={isSaving}>
-              {isSaving
-                ? isCreate
-                  ? "Creating…"
-                  : "Saving…"
-                : isCreate
-                ? "Create"
-                : "Save"}
-            </Button>
+      <div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-zinc-400">
+            {isCreate
+              ? "Nou brief"
+              : `Carregat a ${formatLoadedAt(props.loadedAt)}`}
           </div>
+          {mode === "view" ? (
+            <Button type="button" size="sm" variant="outline" onClick={enterEdit}>
+              Edit
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={cancelEdit}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={isSaving || !isValid}>
+                {isSaving
+                  ? isCreate
+                    ? "Creating…"
+                    : "Saving…"
+                  : isCreate
+                  ? "Create"
+                  : "Save"}
+              </Button>
+            </div>
+          )}
+        </div>
+        {mode === "edit" && !isValid && (
+          <p className="mt-2 text-right text-xs text-zinc-500">
+            {isCreate
+              ? "Omple els camps obligatoris per crear el brief."
+              : "Hi ha camps obligatoris buits o invàlids; revisa els avisos en vermell."}
+          </p>
         )}
       </div>
 
@@ -634,9 +649,9 @@ export function BriefForm(props: Props) {
             <DialogHeader>
               <DialogTitle>Delete brief?</DialogTitle>
               <DialogDescription>
-                Vols esborrar <span className="font-mono">{props.filename}.yml</span>?
-                Aquesta acció és recuperable des de l&apos;historial de git, però la
-                propera execució programada no es disparrà.
+                Vols esborrar el brief «{brief.name}»? Aquesta acció és
+                recuperable des de l&apos;historial de git, però la propera
+                execució programada no es disparrà.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
