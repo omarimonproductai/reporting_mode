@@ -1,10 +1,20 @@
-name: Testing mode 1445
-schedule: 15 * * * *
+name: Testing mode CH30
+schedule: 30 * * * *
 slack_channel: test-github-oriol
 sources:
   - mode_report_token: 7b89f8a2f8d8
     queries:
       - token: 4c71991707f0
         csv: true
-prompt: segueixo provant
+prompt: |-
+  Indica quantes files té el CSV.
+
+  Estructura del brief (200 palabras, sin secciones explícitas, párrafos cortos).
+
+
+  Reglas estrictas:
+  - Porcentajes con un decimal (ej. 67.3%).
+  - Lenguaje directo, sin introducciones genéricas ("En este informe...", "Como podemos observar...") ni conclusiones.
+  - No inventes datos. Si una versión no aparece en la fecha más reciente, no la menciones.
+  - No uses la palabra "tasa". Usa "porcentaje" o "%" directamente.
 owner_email: null
