@@ -1,18 +1,12 @@
-# Brief: daily app version adoption snapshot for the Product team.
-# Tracks which version of the Cooltra app is being used per OS family,
-# based on rental events.
-
-name: "App Version Adoption"
-schedule: "0 10 * * *"          # daily at 10:00 local Cooltra time
-timezone: "Europe/Madrid"        # interpret schedule in Madrid local time (handles DST)
+name: App Version Adoption 2
+schedule: 0 10 * * *
+timezone: Europe/Madrid
 slack_channel: test-github-oriol
-csv: true                        # attach raw query data as CSV thread reply
-
 sources:
   - mode_report_token: 7b89f8a2f8d8
     queries:
-      - 4c71991707f0   # Version_evolution
-
+      - token: 4c71991707f0
+        csv: true
 prompt: |
   Eres analista de producto en Cooltra. Genera un mini-brief en castellano para el equipo de Producto sobre la adopción de versiones de la app móvil, basado en los datos proporcionados.
 
@@ -38,3 +32,4 @@ prompt: |
   - Si hay más de 5 versiones con menos del 2% de adopción, agrúpalas como "otras versiones residuales" indicando el % total agrupado.
   - No inventes datos. Si una versión no aparece en la fecha más reciente, no la menciones.
   - No uses la palabra "tasa". Usa "porcentaje" o "%" directamente.
+owner_email: null
