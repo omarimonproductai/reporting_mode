@@ -27,8 +27,10 @@ Thumbs.db
 *.log
 out/
 
-# Dashboard build output (deployed to Pages from CI)
-docs/
+# Web app (Next.js on Vercel)
+web/node_modules/
+web/.next/
+web/.vercel/
 
 # notes
 mynotes.md
