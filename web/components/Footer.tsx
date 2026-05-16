@@ -22,9 +22,7 @@ export async function Footer() {
 
   try {
     const commit = await getLatestCommit();
-    buildLine = commit.prNumber
-      ? `Built #${commit.prNumber}`
-      : `Built ${commit.sha.slice(0, 7)}`;
+    buildLine = `Built ${commit.sha.slice(0, 7)}`;
     timeLine = formatCatalunya(commit.authoredAt);
   } catch {
     buildLine = "Version info unavailable";
