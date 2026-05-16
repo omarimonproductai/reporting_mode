@@ -73,7 +73,7 @@ The active iteration is tracked in `tasks/tasks-online-brief-platform.md`. Major
 
 - 1.0–3.0 ✅ Initial monorepo + web CRUD for briefs.
 - 4.0 ✅ Per-brief execution metadata + run history surfaced in the UI.
-- 5.0 🚧 Schedule/Calendar view, UX polish, retire static dashboard.
+- 5.0 ✅ Schedule/Calendar view, UX polish, retire static dashboard.
 - 6.0 ⏳ Manual "Run Now" button (workflow_dispatch from the web app).
 - 7.0 ⏳ Multi-language support.
 - 8.0 ⏳ Mode space catalog — name-based pickers for reports + queries.
