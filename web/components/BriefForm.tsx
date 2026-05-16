@@ -74,12 +74,12 @@ const FIELD_HELP = {
   reference_link:
     "URL opcional que s'afegeix com a línia clicable al final del missatge de Slack. Útil per indicar als destinataris on poden veure les dades de referència o ampliar el context. Format: URL completa (https://...). Exemple: «https://app.mode.com/ecooltra706/reports/abc123».",
   prompt:
-    "Instruccions que rep el LLM per generar el brief. Les dades de cada query s'adjunten automàticament al final del prompt. Format: text lliure (pots usar markdown, llistes, seccions «## Title»). Sigues específic amb el format de sortida que esperes.",
+    "Instruccions que rep el LLM per generar el brief. Les dades de cada query s'adjunten automàticament al final del prompt en format JSON. Format: text lliure (pots usar markdown, llistes, seccions «## Title»). Sigues específic amb el format de sortida que esperes. Exemple: «Resumeix les dades en 3 bullets: tendència principal, anomalia més rellevant, recomanació concreta. No incloguis introducció.»",
   mode_report:
-    'Identificador del report de Mode des d\'on s\'extrauen les dades. Format: l\'string alfanumèric que apareix a la URL del report a app.mode.com («/reports/<id>»). Exemple: «7b89f8a2f8d8».',
+    'Identificador del report de Mode des d\'on s\'extrauen les dades. Format: l\'string alfanumèric que apareix a la URL del report a app.mode.com («/reports/<id>»). Exemple: «7b89f8a2f8d8». Un brief pot tenir múltiples sources, cadascun apuntant a un report diferent.',
   query_token:
-    'Identificador d\'una query individual dins del report de Mode. Format: l\'string que apareix quan obres la query ampliada a Mode. Exemple: «4c71991707f0». Un mateix source pot tenir diverses queries.',
-  csv: "Marca-ho si vols rebre el CSV brut d'aquesta query com a resposta dins del thread del brief a Slack. Útil quan algú vol fer un anàlisi propi més enllà del resum del LLM.",
+    'Identificador d\'una query individual dins del report de Mode. Format: l\'string que apareix quan obres la query ampliada a Mode (URL: «/reports/<report>/queries/<query>»). Exemple: «4c71991707f0». Un mateix source pot tenir diverses queries del mateix report.',
+  csv: "Marca-ho si vols rebre el CSV brut d'aquesta query com a resposta dins del thread del brief a Slack. Útil quan algú vol fer un anàlisi propi més enllà del resum del LLM. Per defecte: desmarcat (només arriba el resum textual). Cada query del source pot tenir CSV independent.",
 };
 
 function formatLoadedAt(iso: string): string {

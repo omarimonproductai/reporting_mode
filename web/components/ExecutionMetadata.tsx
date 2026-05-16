@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -76,7 +77,11 @@ export function ExecutionMetadata({ filename }: { filename: string }) {
   if (state.kind === "loading") {
     return (
       <Card>
-        <div className="text-xs text-zinc-400">Carregant execució…</div>
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-4 rounded-full" />
+          <Skeleton className="h-4 w-56" />
+          <Skeleton className="ml-auto size-7 rounded-md" />
+        </div>
       </Card>
     );
   }

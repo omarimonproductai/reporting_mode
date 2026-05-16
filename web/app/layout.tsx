@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { BriefSidebar } from "@/components/BriefSidebar";
 import { Footer } from "@/components/Footer";
+import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
@@ -41,13 +42,7 @@ export default function RootLayout({
         <div className="flex min-h-screen">
           <aside className="w-[280px] shrink-0 border-r border-zinc-200 bg-white flex flex-col">
             <div className="flex-1 overflow-y-auto">
-              <Suspense
-                fallback={
-                  <div className="px-4 py-4 text-xs text-zinc-400">
-                    Carregant briefs…
-                  </div>
-                }
-              >
+              <Suspense fallback={<SidebarSkeleton />}>
                 <BriefSidebar />
               </Suspense>
             </div>
