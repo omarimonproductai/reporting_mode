@@ -1,0 +1,10 @@
+name: Check update tablas en snowflake
+schedule: 0 9 * * *
+slack_channel: test-github-oriol
+sources:
+  - mode_report_token: a4b936e1b15b
+    queries:
+      - token: 41866cf9bd17
+        csv: false
+prompt: Mira si alguna table té is fresh false i indica el nom de la taula i la data de la seva darrera actualització.
+owner_email: null
