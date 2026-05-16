@@ -70,12 +70,12 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
 
 ### Manual Test Runs (added 2026-05-16 after user feedback)
 
-T1. The detail view of an existing brief MUST expose a **"Test" button** that triggers an on-demand execution of the brief through the same GitHub Actions workflow used by the schedule (`run-brief.yml`, `workflow_dispatch`). The button is hidden on the create page; it appears only after the brief exists in the repo.
-T2. To prevent Slack spam and runaway token consumption, the platform MUST enforce a **cooldown of 2 minutes per brief between test dispatches**:
-    - **Client-side**: after a successful dispatch, the button stays disabled for 120 seconds and displays a countdown (e.g. `Test — torna a provar en 1:42`).
+T1. The brief detail view MUST expose a **"Run Now" button** at the **top of the form** (above the Brief Name field), prominent so users can fire an on-demand execution with one click. The button triggers the same GitHub Actions workflow used by the schedule (`run-brief.yml`, `workflow_dispatch`). The button is also rendered on the new-brief page but **disabled until the brief has been saved** (a tooltip / hint on the disabled state explains: «Crea el brief abans de poder executar-lo» or equivalent). Once the brief exists, "Run Now" becomes enabled (subject to the cooldown in T2).
+T2. To prevent Slack spam and runaway token consumption, the platform MUST enforce a **cooldown of 2 minutes per brief between Run Now dispatches**:
+    - **Client-side**: after a successful dispatch, the button stays disabled for 120 seconds and displays a countdown (e.g. `Run Now — torna a provar en 1:42`).
     - **Server-side**: the API endpoint MUST reject a second dispatch for the same brief within 120 seconds with HTTP 429 and a `retry_after_seconds` body. The state is in-memory in the serverless function; cross-instance accuracy is best-effort.
 T3. On a successful dispatch the platform MUST toast a confirmation and, if available, link to the GitHub Actions run page so the user can monitor progress.
-T4. Adding the Test button requires extending the platform's GitHub PAT scope to include `actions:write` (currently only `contents:write` + `metadata:read`). This is a manual operator action documented in the rollout runbook.
+T4. Adding the Run Now button requires extending the platform's GitHub PAT scope to include `actions:write` (currently only `contents:write` + `metadata:read`). This is a manual operator action documented in the rollout runbook.
 
 ### Per-Brief Execution Metadata
 
