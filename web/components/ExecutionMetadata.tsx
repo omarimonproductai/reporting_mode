@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { RunRecord } from "@/lib/runs";
+import { outputTokenColorClass } from "@/lib/tokenWarnings";
 
 type State =
   | { kind: "loading" }
@@ -174,7 +175,9 @@ export function ExecutionMetadata({ filename }: { filename: string }) {
               <span className="font-mono text-xs text-zinc-500">
                 {t.input.toLocaleString("ca-ES")} in
                 <span className="text-zinc-400"> + </span>
-                {t.output.toLocaleString("ca-ES")} out
+                <span className={outputTokenColorClass(t.output)}>
+                  {t.output.toLocaleString("ca-ES")} out
+                </span>
                 <span className="text-zinc-400">
                   {" "}
                   ({t.total.toLocaleString("ca-ES")} total)

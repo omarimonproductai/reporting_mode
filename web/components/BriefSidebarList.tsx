@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { BriefListItemWithRun } from "@/lib/briefs";
 import type { RunLookup } from "@/lib/runs";
+import { outputTokenColorClass } from "@/lib/tokenWarnings";
 
 // Heuristic: with the 280px sidebar at Inter text-sm, a name longer
 // than ~28 characters won't fit before the truncation ellipsis kicks
@@ -128,7 +129,10 @@ function RunMeta({ run }: { run: RunLookup }) {
       <span>{when}</span>
       {tokens && (
         <span className="font-mono text-zinc-400">
-          {formatK(tokens.input)} + {formatK(tokens.output)}
+          {formatK(tokens.input)} +{" "}
+          <span className={outputTokenColorClass(tokens.output)}>
+            {formatK(tokens.output)}
+          </span>
         </span>
       )}
     </span>
