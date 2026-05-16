@@ -7,8 +7,10 @@ sources:
     queries:
       - token: 4c71991707f0
         csv: true
+      - token: 26601d07c6e9
+        csv: true
 prompt: |
-  Eres analista de producto en Cooltra. Genera un mini-brief en castellano para el equipo de Producto sobre la adopción de versiones de la app móvil, basado en los datos proporcionados.
+  Eres analista de producto en Cooltra. Genera un mini-brief en castellano para el equipo de Producto sobre la adopción de versiones de la app móvil, basado en los datos proporcionados y recordando en qué fecha se lanzó la última versión tanto de ios como de Android.
 
   Columnas del dataset:
   - rental_date: fecha del periodo.
