@@ -6,5 +6,7 @@ sources:
     queries:
       - token: 41866cf9bd17
         csv: false
-prompt: Mira si alguna table té is fresh false i indica el nom de la taula i la data de la seva darrera actualització.
+prompt: |-
+  Mira si alguna table té is fresh false i indica el nom de la taula i la data de la seva darrera actualització.
+  Fes una redacció molt detallada sobre el que opines que pot contenir cada taula. Almenys 25 paraules per cada taula.
 owner_email: null
