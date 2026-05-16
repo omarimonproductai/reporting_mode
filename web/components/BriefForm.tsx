@@ -581,7 +581,7 @@ export function BriefForm(props: Props) {
 
       <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Inputs
+          Content
         </h2>
 
         <div>
@@ -645,11 +645,40 @@ export function BriefForm(props: Props) {
             <FieldError message={errors.prompt?.message} />
           )}
         </div>
+
+        <div>
+          <LabelRow
+            htmlFor="reference_link"
+            hint={{ text: FIELD_HELP.reference_link, label: "Reference link" }}
+          >
+            Reference link
+          </LabelRow>
+          {isEditing ? (
+            <Input
+              id="reference_link"
+              type="url"
+              placeholder="https://..."
+              {...register("reference_link")}
+              aria-invalid={
+                shouldShowError("reference_link") && !!errors.reference_link
+              }
+            />
+          ) : brief.reference_link ? (
+            <ReadonlyValue mono>{brief.reference_link}</ReadonlyValue>
+          ) : (
+            <div className="rounded-md border border-dashed border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm italic text-zinc-400">
+              Cap reference link
+            </div>
+          )}
+          {shouldShowError("reference_link") && (
+            <FieldError message={errors.reference_link?.message} />
+          )}
+        </div>
       </section>
 
       <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Outputs
+          Distribution
         </h2>
 
         <div>
@@ -703,35 +732,6 @@ export function BriefForm(props: Props) {
           )}
           {shouldShowError("slack_channel") && (
             <FieldError message={errors.slack_channel?.message} />
-          )}
-        </div>
-
-        <div>
-          <LabelRow
-            htmlFor="reference_link"
-            hint={{ text: FIELD_HELP.reference_link, label: "Reference link" }}
-          >
-            Reference link
-          </LabelRow>
-          {isEditing ? (
-            <Input
-              id="reference_link"
-              type="url"
-              placeholder="https://..."
-              {...register("reference_link")}
-              aria-invalid={
-                shouldShowError("reference_link") && !!errors.reference_link
-              }
-            />
-          ) : brief.reference_link ? (
-            <ReadonlyValue mono>{brief.reference_link}</ReadonlyValue>
-          ) : (
-            <div className="rounded-md border border-dashed border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm italic text-zinc-400">
-              Cap reference link
-            </div>
-          )}
-          {shouldShowError("reference_link") && (
-            <FieldError message={errors.reference_link?.message} />
           )}
         </div>
       </section>
