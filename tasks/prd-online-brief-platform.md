@@ -68,6 +68,15 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
 19. The visual builder MUST emit a **valid cron expression** persisted to the YAML, plus a human-readable description shown to the user (e.g., "Cada dimarts a les 10:00 hora local Cooltra").
 20. The visual builder MAY include a small "Advanced: edit cron directly" toggle for power users; this is a stretch goal, not a v1 requirement.
 
+### Manual Test Runs (added 2026-05-16 after user feedback)
+
+T1. The detail view of an existing brief MUST expose a **"Test" button** that triggers an on-demand execution of the brief through the same GitHub Actions workflow used by the schedule (`run-brief.yml`, `workflow_dispatch`). The button is hidden on the create page; it appears only after the brief exists in the repo.
+T2. To prevent Slack spam and runaway token consumption, the platform MUST enforce a **cooldown of 2 minutes per brief between test dispatches**:
+    - **Client-side**: after a successful dispatch, the button stays disabled for 120 seconds and displays a countdown (e.g. `Test — torna a provar en 1:42`).
+    - **Server-side**: the API endpoint MUST reject a second dispatch for the same brief within 120 seconds with HTTP 429 and a `retry_after_seconds` body. The state is in-memory in the serverless function; cross-instance accuracy is best-effort.
+T3. On a successful dispatch the platform MUST toast a confirmation and, if available, link to the GitHub Actions run page so the user can monitor progress.
+T4. Adding the Test button requires extending the platform's GitHub PAT scope to include `actions:write` (currently only `contents:write` + `metadata:read`). This is a manual operator action documented in the rollout runbook.
+
 ### Per-Brief Execution Metadata
 
 21. The detail view MUST display, prominently and above the editable form:
@@ -122,9 +131,15 @@ The data layer stays hybrid: briefs continue to be persisted as YAML files in th
 
 ## 6. Design Considerations
 
+- **Language policy** (added 2026-05-16 after user feedback on the 2.0 preview):
+  - **UI chrome is always in English**: every clickable button label, every form field label, page headings, navigation entries, table column headers, status badges. Reason: teams across Cooltra share the vocabulary in English (e.g. «el _Slack channel_»), so support and documentation reference the exact words the user sees on screen.
+  - **Narrative, help, and feedback strings are localised to the user's language** (default Catalan): inline help texts, validation error messages, toasts, dialog descriptions, loading / empty / error states, the «Carregat a HH:MM» indicator and similar status copy.
+  - When localised text references a UI chrome element, the chrome term stays in English in line. Example: the form must render «El **Brief Name** és obligatori» (not «El nom del brief és obligatori»).
+  - Multi-language support is **not implemented in this version**; the architecture must keep all localised strings in a place that lets adding a second language be a configuration change (single dictionary file or framework like `next-intl`). The decision on which mechanism is deferred to a dedicated task; for the time being all localised copy stays in Catalan.
+- **Help-text affordance**: every form field exposes its explanation behind a small **Info icon next to the label**, opened on click via a shadcn Popover. Reason: when always-visible, the descriptions crowded the form visually. (This deviates from the original "no expandable tooltips" stance in this section, kept for history below; the user revised the call after seeing 2.0 live.)
 - **Visual language**: continue with shadcn/ui aesthetic already established in the static dashboard (zinc palette, Inter font, JetBrains Mono for code/tokens, generous padding, subtle borders, rounded-lg). Reuse the design tokens.
 - **Sidebar width**: ~280px on desktop. On screens narrower than `lg` (1024px), the sidebar collapses to a hamburger menu.
-- **Form fields with inline help**: each field renders as `<Label> + <Input> + <description below in small muted text>`. No expandable tooltips at first — just always-visible muted text. PLG philosophy: zero friction, zero hidden info.
+- ~~**Form fields with inline help**: each field renders as `<Label> + <Input> + <description below in small muted text>`. No expandable tooltips at first — just always-visible muted text. PLG philosophy: zero friction, zero hidden info.~~ Superseded by the "Help-text affordance" bullet above (Info-icon Popover) after 2.0 user review.
 - **Cron visual builder**: standalone component, ~400px wide, with three sections: "Quan" (frequency: radio buttons), "A quina hora" (time picker, 15-min increments), "Zona horària" (dropdown defaulting to `Europe/Madrid`). A live preview below shows the human-readable schedule (e.g. "Cada dimarts a les 10:00 (Europe/Madrid)") and, in muted font, the generated cron expression.
 - **Slack channel selector**: shadcn/ui `Combobox` pattern — a button that opens a popover with a searchable list. Public channels show with a `#` icon; private channels show with a `🔒` icon. Channel names rendered in `font-mono` to match Slack's own visual convention. Empty state when the bot is in zero channels: a friendly message + the `/invite @<bot-name>` snippet.
 - **"Bot not in channel" warning**: renders below the channel field as a shadcn/ui `Alert` (warning variant — yellow/amber, not red, because the situation is recoverable). Inside: one line of explanation + a code block with the `/invite` snippet + a small "Copy" button that triggers a transient "Copiat!" toast. A subtle "Refresh channels" link to re-query the list after the user invites the bot.

@@ -7,6 +7,9 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
 - **No conflict detection** for concurrent edits — last-write-wins, with a small "loaded at HH:MM" indicator in the form so the user knows their baseline.
 - **Channel-list refresh by polling** (every 5 min via stale-while-revalidate), no explicit refresh button.
 - **Desktop only**. Mobile may render but is not designed for; forms and views assume ≥ 1024px width.
+- **Language policy** (added 2026-05-16): UI chrome (field labels, buttons, navigation entries, page headings, status badges) is in **English** and is shared vocabulary across teams. Narrative copy (help text, validation errors, toasts, dialog bodies, loading/empty/error states) is **localised to Catalan** by default; when narrative copy references chrome, the chrome term stays English in line (e.g. «El _Slack channel_ és obligatori»). Multi-language is not implemented; the placement of localised strings must allow swapping to a second language without component-by-component edits.
+- **Help-text affordance** (added 2026-05-16): each form field exposes its description behind an Info-icon Popover next to the label, not as always-visible muted text (a deviation from the original PRD design line, kept for history in the PRD).
+- **Manual test runs** (added 2026-05-16, future task 6.0): each existing brief gets a Test button on the detail view that fires `workflow_dispatch` on `run-brief.yml`, with a 2-minute cooldown enforced both client- and server-side.
 
 ## Relevant Files
 
@@ -68,8 +71,8 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
 - [x] **1.0 Project foundation: Next.js + Vercel + layout shell** ✅
   - [x] 1.1 Initialised under `web/` via `npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --yes`. **Note:** scaffolded **Next.js 16.2.6 + React 19.2 + Tailwind v4** (not Next 14 as the PRD assumed). v16 brings async `params`/`searchParams` and renames `middleware` → `proxy` — relevant later, not for 1.0.
   - [x] 1.2 Tailwind v4 deprecates `tailwind.config.js`; theme tokens go inside `web/app/globals.css` under `@theme`. Done there: zinc-based palette + Inter / JetBrains Mono fonts wired via `next/font/google` in `app/layout.tsx`.
-  - [ ] 1.3 **Deferred to start of 2.0.** Reason: `shadcn init` rewrites `globals.css` with its own `oklch` theme, which would clobber the zinc/Inter setup. We don't consume any shadcn component until 2.0 (the `+ New brief` button is the first), so initialising then is cleaner.
-  - [ ] 1.4 **Deferred to start of 2.0** (same reason as 1.3).
+  - [x] 1.3 Done at the start of 2.0: `npx shadcn@latest init -t next -b radix -p nova`. The preset rewrote `globals.css` with the oklch palette and tried to inject Geist as `--font-sans`; reverted the font swap so Inter stays as `--font-sans` (the literal `--color-background: #fafafa` survived the rewrite, so the zinc backdrop is intact). `tw-animate-css` and Lucide icons came in as transitive deps.
+  - [x] 1.4 Done at the start of 2.0: `npx shadcn@latest add button input textarea label dialog sonner`. Popover was added in the 2.0 polish pass to host the Info-icon help text.
   - [x] 1.5 Vercel project `reporting-mode` created under "Oriol's projects"; connected to GitHub repo; Root Directory = `web`; Framework Preset = Next.js; Production branch = `main`; previews enabled for every branch.
   - [x] 1.6 Env vars added in Vercel (Production + Preview, encrypted): `GITHUB_TOKEN` (fine-grained PAT `vercel-reporting-mode`, expires 2027-05-16, scoped to `reporting_mode` with `Contents: Read & write` + `Metadata: Read-only`), `GITHUB_REPO_OWNER`, `GITHUB_REPO_NAME`, `SLACK_BOT_TOKEN` (placeholder until 3.0).
   - [x] 1.7 `web/app/layout.tsx`: persistent left sidebar (~280px width) and main content area. Sidebar is a flex column with placeholder content on top and the Footer pinned to the bottom (deviated from the original "footer bottom-right of main" spec — see 1.10).
@@ -111,6 +114,13 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
   - [x] 2.20 Sources live in `useFieldArray({name: "sources"})`. Edit mode shows a `+ Add source` button + a trash icon per card (hidden when only one source remains).
   - [x] 2.21 Queries live in a nested `useFieldArray` inside `<SourceCard>`. `+ Add query` appends `{token: "", csv: false}`; trash removes (hidden when only one query remains). The CSV checkbox is wired via `Controller`.
   - [x] 2.22 Help text rewritten in the PLG template (what / format / example) across every field. Removed internal references to future tasks from the visible copy.
+  - [x] **2.23 (post-2.0 fix-ups, applied 2026-05-16 after user review)**
+    - **Sidebar refresh**: `BriefSidebar` was a Client Component that fetched `/api/briefs` in a one-shot `useEffect`, so renaming a brief and saving didn't update the sidebar entry. Refactored to a Server Component reading `getBriefList()` directly (new `web/lib/briefs.ts`), with the active-item highlighting delegated to a tiny `BriefSidebarList` client component using `usePathname()`. `router.refresh()` after save / `router.push()` after create-delete now re-render the layout tree and the sidebar picks up the change.
+    - **Info-icon Popover**: replaced the always-visible muted help text with a Popover anchored to a small Info icon next to each Label (added `popover` shadcn primitive). Help still covers every field; users opt in to read it. Validation errors stay inline-and-always-visible below each input.
+    - **Language policy**: enforced the criterion documented in the "Scope" block above:
+      - zod validation messages rewritten in Catalan with chrome terms in English: «El _Name_ és obligatori», «El _Schedule_ ha de ser una expressió cron de 5 camps», etc.
+      - Button-state labels Anglicised: «Desant…» → "Saving…", «Creant…» → "Creating…", «Esborrant…» → "Deleting…", dialog «Esborrar brief?» → "Delete brief?".
+      - Narrative kept Catalan: dialog description, toasts ("Brief desat" / "Brief creat" / "Brief esborrat" / error toasts), `Carregat a HH:MM`, `Nou brief`, sidebar empty state, footer fallback `Versió no disponible`, layout suspense fallbacks (`Carregant briefs…`, `Carregant versió…`).
 
 - [ ] **3.0 Specialised form widgets: cron visual builder + Slack channel combobox**
   - [ ] 3.1 Implement `web/lib/cron.ts`: a `buildCron(state)` function that takes `{frequency, days, hour, minute}` and returns a canonical 5-field cron string; an inverse `parseCron(cron)` that returns the state or `null` when the cron doesn't fit the grid.
@@ -171,3 +181,11 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     5. Manually trigger via GitHub Actions `Run brief` workflow → verify execution metadata appears in the UI within 5 minutes.
     6. Delete the test brief → confirm it disappears from the sidebar and `/schedule`.
   - [ ] 5.16 Open the final PR (`feature/online-brief-platform` → `main`); after merge, switch Vercel's Production branch to `main`; verify the production URL serves the platform.
+
+- [ ] **6.0 Manual test runs per brief** (new, added 2026-05-16 after user feedback)
+  - [ ] 6.1 **User action (cannot be coded)**: extend the existing `vercel-reporting-mode` PAT to include `Actions: Read & write` in addition to `Contents: Read & write` + `Metadata: Read-only`. Update the token value in Vercel (Production + Preview).
+  - [ ] 6.2 Implement `web/lib/dispatch.ts` with `dispatchBriefRun(filename)`: calls `POST /repos/{owner}/{repo}/actions/workflows/run-brief.yml/dispatches` with `{ref: "main", inputs: {brief: filename}}`. Returns the workflow run URL when GitHub exposes one (otherwise the workflow's HTML URL).
+  - [ ] 6.3 Implement `POST /api/briefs/[name]/test`: verifies the brief exists, enforces a 2-minute cooldown via a module-level `Map<filename, lastDispatchedAtMs>` (rejects with 429 + `{retry_after_seconds}` when violated), then calls `dispatchBriefRun`.
+  - [ ] 6.4 Implement `web/components/TestButton.tsx` (client): shadcn Button with a Play icon, in the brief detail view next to Edit. On click, POST the endpoint; on success show a sonner toast with the workflow URL and start a 120-second cooldown; render the countdown inside the button label (`Test — torna a provar en 1:42`); persist the cooldown deadline to `localStorage` keyed by filename so it survives page reloads.
+  - [ ] 6.5 Brief detail view: mount `TestButton` only when intent !== "create" and only in view mode. Hide from the new-brief page.
+  - [ ] 6.6 Manual verification on the Vercel preview: trigger a Test run, confirm the workflow appears in the GitHub Actions tab, confirm the Slack message arrives, confirm the second-press-within-2min is blocked by both UI countdown and server 429.
