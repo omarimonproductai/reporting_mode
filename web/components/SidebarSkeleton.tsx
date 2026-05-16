@@ -5,6 +5,7 @@ export function SidebarSkeleton() {
     <div className="flex flex-col gap-3 p-4">
       <Skeleton className="h-8 w-full" />
       <Skeleton className="h-7 w-full" />
+      <Skeleton className="h-7 w-full" />
       <ul className="mt-2 flex flex-col gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
           <li key={i} className="flex flex-col gap-1 px-2">

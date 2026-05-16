@@ -19,6 +19,7 @@ import { ChannelCombobox } from "@/components/ChannelCombobox";
 import { QueryCombobox } from "@/components/QueryCombobox";
 import { ReportCombobox } from "@/components/ReportCombobox";
 import { CronBuilder } from "@/components/CronBuilder";
+import { useSpaceCatalog } from "@/lib/spaceCatalogClient";
 import {
   Dialog,
   DialogContent,
@@ -193,6 +194,65 @@ function ReadonlyValue({
   );
 }
 
+// View-mode renderers for Mode tokens that look up the human name
+// from the cached space catalog so the brief detail page surfaces
+// reports and queries the same way the BriefForm comboboxes and
+// the / landing do (name + token muted, not raw token alone).
+// Falls back to the raw token in font-mono when the catalog is
+// still loading or the token is no longer present in the space.
+function ReportReadonly({ value }: { value: string }) {
+  const { state } = useSpaceCatalog();
+  const report =
+    state.kind === "ready"
+      ? state.catalog.reports.find((r) => r.token === value)
+      : undefined;
+  return (
+    <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+      {report ? (
+        <>
+          <div className="text-sm font-medium text-zinc-900">
+            {report.name}
+          </div>
+          <div className="mt-0.5 font-mono text-xs text-zinc-400">
+            {value}
+          </div>
+        </>
+      ) : (
+        <div className="font-mono text-sm text-zinc-900">{value}</div>
+      )}
+    </div>
+  );
+}
+
+function QueryReadonly({
+  value,
+  reportToken,
+}: {
+  value: string;
+  reportToken: string;
+}) {
+  const { state } = useSpaceCatalog();
+  const parentReport =
+    state.kind === "ready"
+      ? state.catalog.reports.find((r) => r.token === reportToken)
+      : undefined;
+  const query = parentReport?.queries.find((q) => q.token === value);
+  return (
+    <div>
+      {query ? (
+        <>
+          <div className="text-sm text-zinc-900">{query.name}</div>
+          <div className="mt-0.5 font-mono text-xs text-zinc-400">
+            {value}
+          </div>
+        </>
+      ) : (
+        <div className="font-mono text-sm text-zinc-900">{value}</div>
+      )}
+    </div>
+  );
+}
+
 type SourceCardProps = {
   sourceIdx: number;
   control: Control<FormValues>;
@@ -281,7 +341,7 @@ function SourceCard({
                   control={control}
                   name={`sources.${sourceIdx}.mode_report_token` as const}
                   render={({ field }) => (
-                    <ReadonlyValue mono>{field.value}</ReadonlyValue>
+                    <ReportReadonly value={field.value} />
                   )}
                 />
               )}
@@ -333,9 +393,10 @@ function SourceCard({
                         `sources.${sourceIdx}.queries.${qIdx}.token` as const
                       }
                       render={({ field }) => (
-                        <div className="font-mono text-sm text-zinc-900">
-                          {field.value}
-                        </div>
+                        <QueryReadonly
+                          value={field.value}
+                          reportToken={watchedReportToken}
+                        />
                       )}
                     />
                   )}
