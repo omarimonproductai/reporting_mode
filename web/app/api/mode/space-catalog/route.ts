@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildCatalogUsageIndex } from "@/lib/catalogIndex";
 import { listReportQueries, listSpaceReports } from "@/lib/mode";
 import type { ReportWithQueries, SpaceCatalog } from "@/lib/mode-types";
 
@@ -29,14 +30,27 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const reports = await listSpaceReports();
+    // Fetch the Mode catalog and the brief usage index in parallel.
+    // The usage index is local (briefs/*.yml) so it always succeeds
+    // fast; Mode is the slow side. We Promise.all them to overlap the
+    // I/O instead of waiting sequentially.
+    const [reports, usageIndex] = await Promise.all([
+      listSpaceReports(),
+      buildCatalogUsageIndex(),
+    ]);
     // Fetch every report's queries in parallel. For a Cooltra-sized
     // space this is a handful of requests; if the space grows large
     // enough to hit rate limits we can shard or paginate later.
     const reportsWithQueries: ReportWithQueries[] = await Promise.all(
       reports.map(async (report) => {
         const queries = await listReportQueries(report.token);
-        return { ...report, queries };
+        return {
+          ...report,
+          queries: queries.map((q) => ({
+            ...q,
+            used_by: usageIndex.get(q.token) ?? [],
+          })),
+        };
       })
     );
     const data: SpaceCatalog = { reports: reportsWithQueries };

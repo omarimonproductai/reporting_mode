@@ -1,7 +1,14 @@
 import { BriefForm } from "@/components/BriefForm";
 import { RunNowButton } from "@/components/RunNowButton";
 
-export default function NewBriefPage() {
+type Props = {
+  searchParams: Promise<{ prefill_report?: string }>;
+};
+
+export default async function NewBriefPage({ searchParams }: Props) {
+  const { prefill_report } = await searchParams;
+  const prefillReport = prefill_report?.trim() ?? "";
+
   return (
     <div className="mx-auto max-w-3xl px-8 py-10">
       <div className="flex items-center justify-between gap-4">
@@ -16,7 +23,10 @@ export default function NewBriefPage() {
         </div>
       </div>
       <div className="mt-8">
-        <BriefForm intent="create" />
+        <BriefForm
+          intent="create"
+          prefillReportToken={prefillReport || undefined}
+        />
       </div>
     </div>
   );

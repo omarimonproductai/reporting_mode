@@ -50,6 +50,12 @@ type EditProps = {
 
 type CreateProps = {
   intent: "create";
+  // Optional Mode report token to pre-fill in the first source.
+  // Used by the Mode catalog landing's "Create brief →" CTA (the
+  // page passes it through from the ?prefill_report=<token> query
+  // string). Empty / undefined means no prefill — start from the
+  // empty brief.
+  prefillReportToken?: string;
 };
 
 type Props = EditProps | CreateProps;
@@ -393,7 +399,24 @@ function SourceCard({
 export function BriefForm(props: Props) {
   const router = useRouter();
   const isCreate = props.intent === "create";
-  const initialBrief = isCreate ? EMPTY_BRIEF : props.initialBrief;
+  // In create mode, optionally pre-fill the first source's
+  // mode_report_token from the prefillReportToken prop. The Mode
+  // catalog landing's "Create brief →" CTA on a zero-brief query
+  // navigates to /briefs/new?prefill_report=<token> and that token
+  // surfaces here so the user lands on a partially-filled form.
+  const initialBrief: Brief = isCreate
+    ? props.prefillReportToken
+      ? {
+          ...EMPTY_BRIEF,
+          sources: [
+            {
+              ...EMPTY_BRIEF.sources[0],
+              mode_report_token: props.prefillReportToken,
+            },
+          ],
+        }
+      : EMPTY_BRIEF
+    : props.initialBrief;
   const [mode, setMode] = useState<FormMode>(isCreate ? "edit" : "view");
   const [sha, setSha] = useState(isCreate ? "" : props.initialSha);
   const [brief, setBrief] = useState(initialBrief);
