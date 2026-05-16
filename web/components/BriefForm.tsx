@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Info, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { CronBuilder } from "@/components/CronBuilder";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { humanize } from "@/lib/cron";
 import { briefSchema, type Brief } from "@/lib/schemas";
 
 type FormMode = "view" | "edit";
@@ -147,6 +149,16 @@ function touchedAtPath(
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="mt-1 text-xs text-red-600">{message}</p>;
+}
+
+function SchedulePreview({ cron }: { cron: string }) {
+  const text = humanize(cron);
+  return (
+    <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+      <div className="text-sm text-zinc-900">{text ?? "—"}</div>
+      <div className="mt-1 font-mono text-xs text-zinc-500">{cron}</div>
+    </div>
+  );
 }
 
 function ReadonlyValue({
@@ -633,14 +645,15 @@ export function BriefForm(props: Props) {
             Schedule
           </LabelRow>
           {isEditing ? (
-            <Input
-              id="schedule"
-              className="font-mono"
-              {...register("schedule")}
-              aria-invalid={shouldShowError("schedule") && !!errors.schedule}
+            <Controller
+              control={control}
+              name="schedule"
+              render={({ field }) => (
+                <CronBuilder value={field.value} onChange={field.onChange} />
+              )}
             />
           ) : (
-            <ReadonlyValue mono>{brief.schedule}</ReadonlyValue>
+            <SchedulePreview cron={brief.schedule} />
           )}
           {shouldShowError("schedule") && (
             <FieldError message={errors.schedule?.message} />
