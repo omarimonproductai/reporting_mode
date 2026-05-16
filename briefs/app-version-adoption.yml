@@ -1,5 +1,5 @@
-name: App Version Adoption 2
-schedule: 30 13 * * *
+name: App Version Adoption 2 1515
+schedule: 15 15 * * *
 slack_channel: test-github-oriol
 sources:
   - mode_report_token: 7b89f8a2f8d8
