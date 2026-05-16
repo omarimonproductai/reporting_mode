@@ -30,6 +30,7 @@ prompt: |
 
   Reglas estrictas:
   - Porcentajes con un decimal (ej. 67.3%).
+  - Escriu en català
   - Lenguaje directo, sin introducciones genéricas ("En este informe...", "Como podemos observar...") ni conclusiones.
   - Si hay más de 5 versiones con menos del 2% de adopción, agrúpalas como "otras versiones residuales" indicando el % total agrupado.
   - No inventes datos. Si una versión no aparece en la fecha más reciente, no la menciones.
