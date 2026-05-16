@@ -1,4 +1,4 @@
-name: Nom del brief 1445
+name: Nom del brief CH15
 schedule: 45 14 * * *
 slack_channel: testing-canal-nou-eliminar
 sources:
