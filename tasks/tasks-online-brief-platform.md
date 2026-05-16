@@ -184,11 +184,6 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
       - **Content** = everything that travels with the message (Sources + Prompt + Reference link).
       - **Distribution** = when and where it's published (Schedule + Slack Channel).
       Pure copy change in `BriefForm.tsx`; YAML keys, schemas and Python executor are unaffected.
-  - [ ] 4.9 Implement `web/components/ExecutionMetadata.tsx`: a prominent card on the brief detail page (above the form) showing: large status indicator, absolute timestamp in Madrid time with tooltip showing UTC, separate "Input tokens" / "Output tokens" stats, and the error message in muted red if status=failed.
-  - [ ] 4.10 Handle three edge cases gracefully:
-    - **Never run** — show "Mai executat" instead of an empty card.
-    - **No recent artifact** (older than 90 days) — show "Cap execució recent registrada".
-    - **API failure** — show "No s'ha pogut carregar la informació d'execució" with a retry button.
 
 - [ ] **5.0 List-calendar + schema migration + polish + retire static dashboard**
   - [x] 5.1 Done as part of the timezone removal (commit 714219b). `scripts/executor.py` now reads `csv` from each query: `fetch_source` returns a `csv_by_name` mapping; `post_brief_to_slack` filters per-query before uploading. Bare-string queries still accepted and treated as `csv: false`.
