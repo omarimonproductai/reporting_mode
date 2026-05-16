@@ -1,7 +1,6 @@
 name: Nom del brief
-schedule: 0 8 * * *
-timezone: Europe/Madrid
-slack_channel: test-github-oriol
+schedule: 45 14 * * *
+slack_channel: testing-canal-nou-eliminar
 sources:
   - mode_report_token: 7b89f8a2f8d8
     queries:
