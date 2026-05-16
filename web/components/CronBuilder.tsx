@@ -90,6 +90,9 @@ export function CronBuilder({ value, onChange }: Props) {
       case "daily":
         next = { ...state, frequency: { kind: "daily" } };
         break;
+      case "hourly":
+        next = { ...state, frequency: { kind: "hourly" } };
+        break;
       case "weekly":
         next = { ...state, frequency: { kind: "weekly", days: [1, 2, 3, 4, 5] } };
         break;
@@ -164,6 +167,7 @@ export function CronBuilder({ value, onChange }: Props) {
 
   const preview = humanize(buildCron(state));
   const rawCron = buildCron(state);
+  const isHourly = state.frequency.kind === "hourly";
   const isWeekly = state.frequency.kind === "weekly";
   const isMonthly = state.frequency.kind === "monthly";
 
@@ -180,6 +184,7 @@ export function CronBuilder({ value, onChange }: Props) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="daily">Cada dia</SelectItem>
+            <SelectItem value="hourly">Cada hora</SelectItem>
             <SelectItem value="weekly">Dies de la setmana</SelectItem>
             <SelectItem value="monthly">Dia del mes</SelectItem>
           </SelectContent>
@@ -233,24 +238,31 @@ export function CronBuilder({ value, onChange }: Props) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-zinc-600">Time</span>
+        <span className="text-xs font-medium text-zinc-600">
+          {isHourly ? "Minute" : "Time"}
+        </span>
         <div className="flex items-center gap-2">
-          <Select
-            value={String(state.hour)}
-            onValueChange={(v) => setHour(Number(v))}
-          >
-            <SelectTrigger className="w-20 bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {HOURS.map((h) => (
-                <SelectItem key={h} value={String(h)}>
-                  {pad2(h)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-zinc-500">:</span>
+          {!isHourly && (
+            <>
+              <Select
+                value={String(state.hour)}
+                onValueChange={(v) => setHour(Number(v))}
+              >
+                <SelectTrigger className="w-20 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {HOURS.map((h) => (
+                    <SelectItem key={h} value={String(h)}>
+                      {pad2(h)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-zinc-500">:</span>
+            </>
+          )}
+          {isHourly && <span className="text-zinc-500">:</span>}
           <Select
             value={String(state.minute)}
             onValueChange={(v) => setMinute(Number(v) as Minute)}

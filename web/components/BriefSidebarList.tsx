@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { BriefListItemWithRun } from "@/lib/briefs";
 import type { RunLookup } from "@/lib/runs";
@@ -28,21 +33,26 @@ export function BriefSidebarList({
         const isActive = pathname === href;
         return (
           <li key={brief.filename}>
-            <Link
-              href={href}
-              className={cn(
-                "flex flex-col gap-0.5 rounded-md px-2 py-1.5 text-sm text-zinc-700 transition-colors",
-                isActive
-                  ? "bg-zinc-100 font-medium text-zinc-900"
-                  : "hover:bg-zinc-100"
-              )}
-            >
-              <div className="flex items-center gap-1.5">
-                <StatusIcon run={brief.run} />
-                <span className="truncate">{brief.name}</span>
-              </div>
-              <RunMeta run={brief.run} />
-            </Link>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href={href}
+                  className={cn(
+                    "flex flex-col gap-0.5 rounded-md px-2 py-1.5 text-sm text-zinc-700 transition-colors",
+                    isActive
+                      ? "bg-zinc-100 font-medium text-zinc-900"
+                      : "hover:bg-zinc-100"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <StatusIcon run={brief.run} />
+                    <span className="min-w-0 flex-1 truncate">{brief.name}</span>
+                  </div>
+                  <RunMeta run={brief.run} />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">{brief.name}</TooltipContent>
+            </Tooltip>
           </li>
         );
       })}
