@@ -67,8 +67,16 @@ function AccordionContent({
       {...props}
     >
       <div
+        // Removed the upstream `h-(--radix-accordion-content-height)` lock:
+        // it freezes the inner height to the value measured on open, which
+        // breaks any content that grows dynamically inside the open
+        // accordion (e.g. the catalog page expanding the consumer list
+        // under a query badge). The outer `AccordionPrimitive.Content`
+        // still animates via the same CSS variable, so the open/close
+        // transition is unchanged; after the animation the height
+        // reverts to auto and the inner is free to grow.
         className={cn(
-          "h-(--radix-accordion-content-height) pt-0 pb-2.5 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
+          "pt-0 pb-2.5 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
           className
         )}
       >
