@@ -405,6 +405,7 @@ export function BriefForm(props: Props) {
 
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const isEditing = mode === "edit";
 
@@ -413,13 +414,18 @@ export function BriefForm(props: Props) {
     setMode("edit");
   }
 
-  function cancelEdit() {
+  function attemptCancel() {
     if (isCreate) {
-      router.push("/");
+      setCancelOpen(true);
       return;
     }
     reset(brief);
     setMode("view");
+  }
+
+  function confirmCancel() {
+    setCancelOpen(false);
+    router.push("/");
   }
 
   async function onDelete() {
@@ -497,6 +503,43 @@ export function BriefForm(props: Props) {
     }
   }
 
+  const actionButtons =
+    mode === "view" ? (
+      <Button type="button" size="sm" variant="outline" onClick={enterEdit}>
+        Edit
+      </Button>
+    ) : (
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={attemptCancel}
+          disabled={isSaving}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={isSaving || !isValid}>
+          {isSaving
+            ? isCreate
+              ? "Creating…"
+              : "Saving…"
+            : isCreate
+            ? "Create"
+            : "Save"}
+        </Button>
+      </div>
+    );
+
+  const validityHint =
+    mode === "edit" && !isValid ? (
+      <p className="mt-2 text-right text-xs text-zinc-500">
+        {isCreate
+          ? "Omple els camps obligatoris per crear el brief."
+          : "Hi ha camps obligatoris buits o invàlids; revisa els avisos en vermell."}
+      </p>
+    ) : null;
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div>
@@ -506,40 +549,9 @@ export function BriefForm(props: Props) {
               ? "Nou brief"
               : `Carregat a ${formatLoadedAt(props.loadedAt)}`}
           </div>
-          {mode === "view" ? (
-            <Button type="button" size="sm" variant="outline" onClick={enterEdit}>
-              Edit
-            </Button>
-          ) : (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={cancelEdit}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" disabled={isSaving || !isValid}>
-                {isSaving
-                  ? isCreate
-                    ? "Creating…"
-                    : "Saving…"
-                  : isCreate
-                  ? "Create"
-                  : "Save"}
-              </Button>
-            </div>
-          )}
+          {actionButtons}
         </div>
-        {mode === "edit" && !isValid && (
-          <p className="mt-2 text-right text-xs text-zinc-500">
-            {isCreate
-              ? "Omple els camps obligatoris per crear el brief."
-              : "Hi ha camps obligatoris buits o invàlids; revisa els avisos en vermell."}
-          </p>
-        )}
+        {validityHint}
       </div>
 
       <div>
@@ -692,6 +704,13 @@ export function BriefForm(props: Props) {
         </div>
       </section>
 
+      <div className="border-t border-zinc-200 pt-6">
+        <div className="flex items-center justify-end gap-3">
+          {actionButtons}
+        </div>
+        {validityHint}
+      </div>
+
       {!isCreate && mode === "view" && (
         <div className="flex justify-end border-t border-zinc-200 pt-6">
           <Button
@@ -733,6 +752,36 @@ export function BriefForm(props: Props) {
                 disabled={isDeleting}
               >
                 {isDeleting ? "Deleting…" : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {isCreate && (
+        <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel create?</DialogTitle>
+              <DialogDescription>
+                Si cancel·les ara, es perdran tots els canvis que has fet en
+                aquest formulari. Aquesta acció no es pot desfer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCancelOpen(false)}
+              >
+                Keep editing
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={confirmCancel}
+              >
+                Discard changes
               </Button>
             </DialogFooter>
           </DialogContent>
