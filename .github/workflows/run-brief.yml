@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Compute brief slug
+        id: slug
+        run: |
+          slug=$(basename "${{ inputs.brief }}" .yml)
+          echo "value=$slug" >> "$GITHUB_OUTPUT"
+
       - name: Run brief
         env:
           DEFAULT_MODE_ACCOUNT: ${{ secrets.DEFAULT_MODE_ACCOUNT }}
@@ -35,3 +41,12 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: python scripts/executor.py "${{ inputs.brief }}"
+
+      - name: Upload run record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-${{ steps.slug.outputs.value }}-${{ github.run_id }}
+          path: out/*.run.json
+          retention-days: 90
+          if-no-files-found: warn

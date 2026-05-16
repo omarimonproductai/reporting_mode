@@ -29,7 +29,7 @@ import os
 import re
 import sys
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import requests
@@ -277,6 +277,12 @@ def build_user_message(sources_data):
 
 
 def generate_brief(prompt, user_message):
+    """Call the LLM and return (content, usage).
+
+    usage is a dict {"input": int, "output": int, "total": int}; the
+    values come from response.usage when the provider exposes it,
+    otherwise zeros so downstream code can still serialise it.
+    """
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         sys.exit("ERROR: GROQ_API_KEY no definit. Comprova .env (local) o secrets (CI).")
@@ -290,7 +296,17 @@ def generate_brief(prompt, user_message):
             {"role": "user", "content": user_message},
         ],
     )
-    return response.choices[0].message.content
+    raw_usage = getattr(response, "usage", None)
+    input_tokens = int(getattr(raw_usage, "prompt_tokens", 0) or 0)
+    output_tokens = int(getattr(raw_usage, "completion_tokens", 0) or 0)
+    total_tokens = int(getattr(raw_usage, "total_tokens", 0) or 0) \
+        or (input_tokens + output_tokens)
+    usage = {
+        "input": input_tokens,
+        "output": output_tokens,
+        "total": total_tokens,
+    }
+    return response.choices[0].message.content, usage
 
 
 def markdown_to_slack(text):
@@ -386,9 +402,9 @@ def post_brief_to_slack(brief, sources_data, brief_text):
         print(f"   ✓ {filename} ({len(rows)} files)")
 
 
-def save_artifacts(brief, sources_data, brief_text):
+def save_artifacts(brief, brief_path, sources_data, brief_text):
     OUT_DIR.mkdir(exist_ok=True)
-    slug = re.sub(r"[^a-z0-9]+", "-", brief["name"].lower()).strip("-")
+    slug = brief_slug_from_path(brief_path)
     raw = {
         "brief": brief["name"],
         "generated_at": date.today().isoformat(),
@@ -409,38 +425,111 @@ def save_artifacts(brief, sources_data, brief_text):
     (OUT_DIR / f"{slug}.brief.md").write_text(brief_text, encoding="utf-8")
 
 
+def brief_slug_from_path(brief_path):
+    """Filename-based slug for execution artifacts.
+
+    The slug used for out/<slug>.run.json (and <slug>.raw.json /
+    <slug>.brief.md) is derived from the brief YAML's filename, NOT from
+    brief["name"]. Reason: filenames are stable across renames, while
+    brief.name can be edited freely from the web app. The web app's
+    /api/runs/[brief] looks up artifacts using the same filename slug,
+    so the two sides stay aligned.
+    """
+    return Path(brief_path).stem
+
+
+def write_run_record(brief, brief_path, state):
+    """Write the per-execution status JSON read later by the web app.
+
+    The web app (task 4.6) fetches the most recent artifact named
+    run-<filename-slug>-* or runs-due-* and parses this file to render
+    the ExecutionMetadata card. Schema must stay stable.
+    """
+    OUT_DIR.mkdir(exist_ok=True)
+    slug = brief_slug_from_path(brief_path)
+    record = {
+        "brief": brief["name"],
+        "started_at": state["started_at"],
+        "finished_at": state["finished_at"],
+        "status": state["status"],
+        "tokens": state["tokens"],
+        "error": state["error"],
+    }
+    (OUT_DIR / f"{slug}.run.json").write_text(
+        json.dumps(record, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
 def main():
     if len(sys.argv) != 2:
         sys.exit("Usage: python scripts/executor.py <brief.yml>")
     brief_path = sys.argv[1]
+
+    started_at = datetime.now(timezone.utc).isoformat()
+
+    # Load brief before opening the try/finally: if the YAML is unreadable
+    # or invalid we can't derive a slug, so the run.json can't be written
+    # anyway. Let load_brief()'s sys.exit propagate.
     brief = load_brief(brief_path)
 
-    print("=" * 70)
-    print(f"BRIEF: {brief['name']}")
-    print("=" * 70)
+    state = {
+        "started_at": started_at,
+        "finished_at": None,
+        "status": "failed",
+        "tokens": None,
+        "error": "unknown failure before completion",
+    }
 
-    auth = load_credentials()
+    try:
+        print("=" * 70)
+        print(f"BRIEF: {brief['name']}")
+        print("=" * 70)
 
-    sources_data = []
-    for source in brief["sources"]:
-        title, results, csv_by_name = fetch_source(auth, source)
-        sources_data.append((source, title, results, csv_by_name))
+        auth = load_credentials()
 
-    print(f"-> Generant brief amb {LLM_MODEL}...")
-    user_message = build_user_message(sources_data)
-    brief_text = generate_brief(brief["prompt"], user_message)
+        sources_data = []
+        for source in brief["sources"]:
+            title, results, csv_by_name = fetch_source(auth, source)
+            sources_data.append((source, title, results, csv_by_name))
 
-    save_artifacts(brief, sources_data, brief_text)
+        print(f"-> Generant brief amb {LLM_MODEL}...")
+        user_message = build_user_message(sources_data)
+        brief_text, usage = generate_brief(brief["prompt"], user_message)
+        state["tokens"] = usage
+        print(
+            f"   tokens: input={usage['input']} output={usage['output']} "
+            f"total={usage['total']}"
+        )
 
-    print("")
-    print("=" * 70)
-    print("OUTPUT")
-    print("=" * 70)
-    print(brief_text)
-    print("=" * 70)
-    print("")
+        save_artifacts(brief, brief_path, sources_data, brief_text)
 
-    post_brief_to_slack(brief, sources_data, brief_text)
+        print("")
+        print("=" * 70)
+        print("OUTPUT")
+        print("=" * 70)
+        print(brief_text)
+        print("=" * 70)
+        print("")
+
+        post_brief_to_slack(brief, sources_data, brief_text)
+
+        state["status"] = "success"
+        state["error"] = None
+    except BaseException as exc:
+        # Catch BaseException so sys.exit() paths and unexpected errors
+        # are both recorded. The exception is re-raised in finally's wake
+        # so the workflow still exits non-zero.
+        msg = str(exc) or repr(exc)
+        state["error"] = msg
+        raise
+    finally:
+        state["finished_at"] = datetime.now(timezone.utc).isoformat()
+        try:
+            write_run_record(brief, brief_path, state)
+        except Exception as werr:
+            # Don't shadow the original failure if we can't write the record
+            print(f"WARNING: no s'ha pogut escriure el run record: {werr}")
 
 
 if __name__ == "__main__":

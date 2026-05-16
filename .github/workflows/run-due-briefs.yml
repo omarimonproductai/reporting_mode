@@ -30,6 +30,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Compute timestamp
+        id: ts
+        run: echo "value=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Scan and dispatch due briefs
         env:
           DEFAULT_MODE_ACCOUNT: ${{ secrets.DEFAULT_MODE_ACCOUNT }}
@@ -38,3 +42,12 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: python scripts/due_runner.py
+
+      - name: Upload run records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runs-due-${{ steps.ts.outputs.value }}-${{ github.run_id }}
+          path: out/*.run.json
+          retention-days: 90
+          if-no-files-found: ignore

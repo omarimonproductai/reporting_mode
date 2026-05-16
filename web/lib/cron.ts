@@ -3,6 +3,7 @@ export const ALLOWED_MINUTES: Minute[] = [0, 15, 30, 45];
 
 export type Frequency =
   | { kind: "daily" }
+  | { kind: "hourly" }
   | { kind: "weekly"; days: number[] }
   | { kind: "monthly"; dayOfMonth: number };
 
@@ -36,6 +37,8 @@ export function buildCron(state: CronState): string {
   switch (state.frequency.kind) {
     case "daily":
       return `${m} ${h} * * *`;
+    case "hourly":
+      return `${m} * * * *`;
     case "weekly": {
       const days = [...state.frequency.days].sort((a, b) => a - b);
       const dayPart = days.length > 0 ? days.join(",") : "*";
@@ -54,10 +57,20 @@ export function parseCron(cron: string): CronState | null {
   const minute = Number(minStr);
   if (!Number.isInteger(minute) || !isMinute(minute)) return null;
 
+  if (monStr !== "*") return null;
+
+  // Hourly: `MM * * * *` — every hour at minute MM. The hour field in
+  // CronState is irrelevant here; default to 0 so it round-trips cleanly
+  // if the user switches back to daily without setting an hour.
+  if (hourStr === "*") {
+    if (domStr === "*" && dowStr === "*") {
+      return { frequency: { kind: "hourly" }, hour: 0, minute };
+    }
+    return null;
+  }
+
   const hour = Number(hourStr);
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
-
-  if (monStr !== "*") return null;
 
   if (domStr === "*" && dowStr === "*") {
     return { frequency: { kind: "daily" }, hour, minute };
@@ -87,6 +100,8 @@ export function humanize(cron: string): string | null {
   switch (state.frequency.kind) {
     case "daily":
       return `Cada dia a les ${time}`;
+    case "hourly":
+      return `Cada hora a les :${pad2(state.minute)}`;
     case "weekly": {
       const days = [...state.frequency.days].sort((a, b) => a - b);
       if (days.length === 0) {
