@@ -12,7 +12,7 @@ import {
   type UseFormRegister,
 } from "react-hook-form";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Info, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { briefSchema, type Brief } from "@/lib/schemas";
 
@@ -84,8 +89,40 @@ function formatLoadedAt(iso: string): string {
   return fmt.format(new Date(iso));
 }
 
-function FieldHelp({ text }: { text: string }) {
-  return <p className="mt-1 text-xs text-zinc-500">{text}</p>;
+function FieldHint({ text, label }: { text: string; label: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex size-4 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+          aria-label={`Info: ${label}`}
+        >
+          <Info className="size-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="right" align="start" className="w-80 text-xs text-zinc-700">
+        {text}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function LabelRow({
+  htmlFor,
+  children,
+  hint,
+}: {
+  htmlFor?: string;
+  children: React.ReactNode;
+  hint?: { text: string; label: string };
+}) {
+  return (
+    <div className="mb-1.5 flex items-center gap-1.5">
+      <Label htmlFor={htmlFor}>{children}</Label>
+      {hint && <FieldHint text={hint.text} label={hint.label} />}
+    </div>
+  );
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -159,9 +196,15 @@ function SourceCard({
       </div>
 
       <div className="mt-2">
-        <Label htmlFor={`mode_report_token_${sourceIdx}`}>
+        <LabelRow
+          htmlFor={`mode_report_token_${sourceIdx}`}
+          hint={{
+            text: FIELD_HELP.mode_report_token,
+            label: "Mode report token",
+          }}
+        >
           Mode report token
-        </Label>
+        </LabelRow>
         {isEditing ? (
           <Input
             id={`mode_report_token_${sourceIdx}`}
@@ -178,12 +221,13 @@ function SourceCard({
             )}
           />
         )}
-        <FieldHelp text={FIELD_HELP.mode_report_token} />
         <FieldError message={sourceErrors?.mode_report_token?.message} />
       </div>
 
       <div className="mt-4">
-        <Label>Queries</Label>
+        <LabelRow hint={{ text: FIELD_HELP.query_token, label: "Queries" }}>
+          Queries
+        </LabelRow>
         <div className="mt-2 flex flex-col gap-2">
           {queries.fields.map((queryField, qIdx) => {
             const queryErrors = sourceErrors?.queries?.[qIdx];
@@ -235,6 +279,7 @@ function SourceCard({
                     )}
                   />
                   CSV
+                  <FieldHint text={FIELD_HELP.csv} label="CSV" />
                 </label>
 
                 {isEditing && queries.fields.length > 1 && (
@@ -264,8 +309,6 @@ function SourceCard({
             </Button>
           )}
         </div>
-        <FieldHelp text={FIELD_HELP.query_token} />
-        <FieldHelp text={FIELD_HELP.csv} />
       </div>
     </div>
   );
@@ -426,19 +469,25 @@ export function BriefForm(props: Props) {
       </div>
 
       <div>
-        <Label htmlFor="name">Name</Label>
+        <LabelRow htmlFor="name" hint={{ text: FIELD_HELP.name, label: "Name" }}>
+          Name
+        </LabelRow>
         {isEditing ? (
           <Input id="name" {...register("name")} aria-invalid={!!errors.name} />
         ) : (
           <ReadonlyValue>{brief.name}</ReadonlyValue>
         )}
-        <FieldHelp text={FIELD_HELP.name} />
         <FieldError message={errors.name?.message} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="schedule">Schedule (cron)</Label>
+          <LabelRow
+            htmlFor="schedule"
+            hint={{ text: FIELD_HELP.schedule, label: "Schedule" }}
+          >
+            Schedule (cron)
+          </LabelRow>
           {isEditing ? (
             <Input
               id="schedule"
@@ -449,12 +498,16 @@ export function BriefForm(props: Props) {
           ) : (
             <ReadonlyValue mono>{brief.schedule}</ReadonlyValue>
           )}
-          <FieldHelp text={FIELD_HELP.schedule} />
           <FieldError message={errors.schedule?.message} />
         </div>
 
         <div>
-          <Label htmlFor="timezone">Timezone</Label>
+          <LabelRow
+            htmlFor="timezone"
+            hint={{ text: FIELD_HELP.timezone, label: "Timezone" }}
+          >
+            Timezone
+          </LabelRow>
           {isEditing ? (
             <Input
               id="timezone"
@@ -464,13 +517,17 @@ export function BriefForm(props: Props) {
           ) : (
             <ReadonlyValue mono>{brief.timezone}</ReadonlyValue>
           )}
-          <FieldHelp text={FIELD_HELP.timezone} />
           <FieldError message={errors.timezone?.message} />
         </div>
       </div>
 
       <div>
-        <Label htmlFor="slack_channel">Slack channel</Label>
+        <LabelRow
+          htmlFor="slack_channel"
+          hint={{ text: FIELD_HELP.slack_channel, label: "Slack channel" }}
+        >
+          Slack channel
+        </LabelRow>
         {isEditing ? (
           <Input
             id="slack_channel"
@@ -481,7 +538,6 @@ export function BriefForm(props: Props) {
         ) : (
           <ReadonlyValue mono>#{brief.slack_channel}</ReadonlyValue>
         )}
-        <FieldHelp text={FIELD_HELP.slack_channel} />
         <FieldError message={errors.slack_channel?.message} />
       </div>
 
@@ -521,7 +577,12 @@ export function BriefForm(props: Props) {
       </div>
 
       <div>
-        <Label htmlFor="prompt">Prompt</Label>
+        <LabelRow
+          htmlFor="prompt"
+          hint={{ text: FIELD_HELP.prompt, label: "Prompt" }}
+        >
+          Prompt
+        </LabelRow>
         {isEditing ? (
           <Textarea
             id="prompt"
@@ -535,7 +596,6 @@ export function BriefForm(props: Props) {
             {brief.prompt}
           </pre>
         )}
-        <FieldHelp text={FIELD_HELP.prompt} />
         <FieldError message={errors.prompt?.message} />
       </div>
 
