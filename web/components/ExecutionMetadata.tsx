@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +35,7 @@ type ApiResponse =
 
 export function ExecutionMetadata({ filename }: { filename: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
+  const router = useRouter();
 
   const load = useCallback(
     async (force: boolean) => {
@@ -61,12 +63,18 @@ export function ExecutionMetadata({ filename }: { filename: string }) {
         } else {
           setState({ kind: "never-run" });
         }
+        // The sidebar lives in the static root layout and won't re-render on
+        // its own. After every successful load (initial mount or manual
+        // refresh) trigger a server re-render so the sidebar's status dot,
+        // relative time and token badge pick up the same data we just showed
+        // in the ExecutionMetadata card.
+        router.refresh();
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         setState({ kind: "error", message });
       }
     },
-    [filename]
+    [filename, router]
   );
 
   useEffect(() => {

@@ -764,8 +764,7 @@ export function BriefForm(props: Props) {
               <DialogTitle>Delete brief?</DialogTitle>
               <DialogDescription>
                 Vols esborrar el brief «{brief.name}»? Aquesta acció és
-                recuperable des de l&apos;historial de git, però la propera
-                execució programada no es disparrà.
+                irreversible.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

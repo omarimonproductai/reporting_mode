@@ -16,7 +16,7 @@ export default function SchedulePage() {
     <div className="mx-auto max-w-5xl px-8 py-10">
       <h1 className="text-2xl font-semibold text-zinc-900">Schedule</h1>
       <p className="mt-1 text-sm text-zinc-500">
-        Briefs ordenats pel proper fire en horari Catalunya.
+        Briefs ordenats pel proper enviament en horari Catalunya.
       </p>
 
       <Suspense fallback={<ScheduleSkeleton />}>
@@ -48,7 +48,7 @@ async function ScheduleTable() {
         <thead className="bg-zinc-50">
           <tr className="text-left text-xs font-medium uppercase tracking-wide text-zinc-500">
             <th className="px-4 py-3">Brief</th>
-            <th className="px-4 py-3">Proper fire</th>
+            <th className="px-4 py-3">Proper enviament</th>
             <th className="px-4 py-3">Schedule</th>
             <th className="px-4 py-3 text-right">Última run</th>
           </tr>

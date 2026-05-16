@@ -184,9 +184,9 @@ export function CronBuilder({ value, onChange }: Props) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="daily">Cada dia</SelectItem>
-            <SelectItem value="hourly">Cada hora</SelectItem>
             <SelectItem value="weekly">Dies de la setmana</SelectItem>
             <SelectItem value="monthly">Dia del mes</SelectItem>
+            <SelectItem value="hourly">Cada hora</SelectItem>
           </SelectContent>
         </Select>
 
