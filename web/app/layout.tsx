@@ -33,25 +33,23 @@ export default function RootLayout({
     >
       <body className="min-h-full">
         <div className="flex min-h-screen">
-          <aside className="w-[280px] shrink-0 border-r border-zinc-200 bg-white">
+          <aside className="w-[280px] shrink-0 border-r border-zinc-200 bg-white flex flex-col">
             {/* BriefSidebar lands here in task 2.6 */}
-            <div className="p-4 text-sm text-zinc-400">
+            <div className="flex-1 p-4 text-sm text-zinc-400">
               Sidebar (placeholder)
             </div>
-          </aside>
-
-          <div className="flex flex-1 flex-col">
-            <main className="flex-1">{children}</main>
             <Suspense
               fallback={
-                <div className="px-6 py-3 text-right text-xs text-zinc-400 font-mono">
+                <div className="px-4 py-3 text-[11px] text-zinc-400 font-mono">
                   Loading version…
                 </div>
               }
             >
               <Footer />
             </Suspense>
-          </div>
+          </aside>
+
+          <main className="flex-1">{children}</main>
         </div>
       </body>
     </html>

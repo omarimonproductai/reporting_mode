@@ -1,6 +1,6 @@
 import { getLatestCommit } from "@/lib/version";
 
-function formatMadrid(iso: string): string {
+function formatCatalunya(iso: string): string {
   const fmt = new Intl.DateTimeFormat("ca-ES", {
     timeZone: "Europe/Madrid",
     day: "2-digit",
@@ -13,28 +13,27 @@ function formatMadrid(iso: string): string {
   const parts = Object.fromEntries(
     fmt.formatToParts(new Date(iso)).map((p) => [p.type, p.value])
   );
-  return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute} Madrid`;
-}
-
-function truncate(s: string, max: number): string {
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+  return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute} Catalunya`;
 }
 
 export async function Footer() {
-  let content: string;
+  let buildLine: string;
+  let timeLine: string | null = null;
+
   try {
     const commit = await getLatestCommit();
-    content = `Built from ${commit.sha.slice(0, 7)} · ${truncate(
-      commit.message,
-      50
-    )} · ${formatMadrid(commit.authoredAt)}`;
+    buildLine = commit.prNumber
+      ? `Built #${commit.prNumber}`
+      : `Built ${commit.sha.slice(0, 7)}`;
+    timeLine = formatCatalunya(commit.authoredAt);
   } catch {
-    content = "Version info unavailable";
+    buildLine = "Version info unavailable";
   }
 
   return (
-    <footer className="px-6 py-3 text-right text-xs text-zinc-500 font-mono">
-      {content}
+    <footer className="px-4 py-3 text-[11px] leading-tight text-zinc-400 font-mono">
+      <div>{buildLine}</div>
+      {timeLine && <div>{timeLine}</div>}
     </footer>
   );
 }

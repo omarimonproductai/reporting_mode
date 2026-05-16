@@ -1,7 +1,7 @@
 export type LatestCommit = {
   sha: string;
-  message: string;
   authoredAt: string;
+  prNumber: number | null;
 };
 
 export async function getLatestCommit(): Promise<LatestCommit> {
@@ -38,9 +38,11 @@ export async function getLatestCommit(): Promise<LatestCommit> {
     commit: { message: string; author: { date: string } };
   };
 
+  const prMatch = data.commit.message.match(/#(\d+)/);
+
   return {
     sha: data.sha,
-    message: data.commit.message.split("\n")[0],
     authoredAt: data.commit.author.date,
+    prNumber: prMatch ? Number(prMatch[1]) : null,
   };
 }
