@@ -1,6 +1,7 @@
 name: Test del cron tasca 3.0 CH15
 schedule: 15 * * * *
 slack_channel: testing-canal-nou-eliminar
+reference_link: https://omarimonagentai.github.io/projects_dashboard/index.html
 sources:
   - mode_report_token: 7b89f8a2f8d8
     queries:
