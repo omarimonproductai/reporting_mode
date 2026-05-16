@@ -52,7 +52,6 @@ type Props = EditProps | CreateProps;
 const EMPTY_BRIEF: Brief = {
   name: "",
   schedule: "0 8 * * *",
-  timezone: "Europe/Madrid",
   slack_channel: "",
   sources: [{ mode_report_token: "", queries: [{ token: "", csv: false }] }],
   prompt: "",
@@ -65,9 +64,7 @@ type FormValues = z.infer<typeof formSchema>;
 const FIELD_HELP = {
   name: 'Nom llegible del brief. Apareix a la barra lateral i com a títol del missatge a Slack. Format: text lliure. Exemple: «App Version Adoption». El nom del fitxer .yml es deriva d\'aquest valor només a la creació; editar-lo després no mou el fitxer.',
   schedule:
-    'Quan s\'executa el brief. Internament és una expressió cron de 5 camps (minut hora dia-mes mes dia-setmana). Exemples: «0 8 * * *» = cada dia a les 08:00; «0 10 * * 1» = cada dilluns a les 10:00.',
-  timezone:
-    'Zona horària amb què s\'interpreta el Schedule. Format: identificador IANA. Exemples: «Europe/Madrid» (per defecte, gestiona els canvis d\'hora), «UTC», «America/New_York».',
+    "Quan s'executa el brief. El Schedule s'interpreta sempre amb l'hora local de Catalunya (canvis d'hora gestionats automàticament). Internament és una expressió cron de 5 camps (minut hora dia-mes mes dia-setmana). Exemples: «0 8 * * *» = cada dia a les 08:00; «0 10 * * 1» = cada dilluns a les 10:00.",
   slack_channel:
     'Canal de Slack on es publica el resultat. Format: només el nom, sense el «#» del davant. Exemple: «test-github-oriol». El bot ha de ser membre del canal abans del proper run; si encara no ho és, fes «/invite @cooltra-reporting-bot» dins del canal.',
   prompt:
@@ -112,17 +109,39 @@ function LabelRow({
   htmlFor,
   children,
   hint,
+  required = false,
 }: {
   htmlFor?: string;
   children: React.ReactNode;
   hint?: { text: string; label: string };
+  required?: boolean;
 }) {
   return (
     <div className="mb-1.5 flex items-center gap-1.5">
-      <Label htmlFor={htmlFor}>{children}</Label>
+      <Label htmlFor={htmlFor}>
+        {children}
+        {required && (
+          <span className="ml-0.5 text-red-600" aria-hidden="true">
+            *
+          </span>
+        )}
+      </Label>
       {hint && <FieldHint text={hint.text} label={hint.label} />}
     </div>
   );
+}
+
+function touchedAtPath(
+  touched: unknown,
+  path: string
+): boolean {
+  const parts = path.split(".");
+  let cursor: unknown = touched;
+  for (const p of parts) {
+    if (!cursor || typeof cursor !== "object") return false;
+    cursor = (cursor as Record<string, unknown>)[p];
+  }
+  return cursor === true;
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -158,6 +177,7 @@ type SourceCardProps = {
   isEditing: boolean;
   onRemoveSource: () => void;
   canRemoveSource: boolean;
+  shouldShowError: (name: string) => boolean;
 };
 
 function SourceCard({
@@ -168,6 +188,7 @@ function SourceCard({
   isEditing,
   onRemoveSource,
   canRemoveSource,
+  shouldShowError,
 }: SourceCardProps) {
   const queries = useFieldArray({
     control,
@@ -202,35 +223,53 @@ function SourceCard({
             text: FIELD_HELP.mode_report,
             label: "Mode report",
           }}
+          required
         >
           Mode report
         </LabelRow>
-        {isEditing ? (
-          <Input
-            id={`mode_report_${sourceIdx}`}
-            className="font-mono"
-            {...register(`sources.${sourceIdx}.mode_report_token` as const)}
-            aria-invalid={!!sourceErrors?.mode_report_token}
-          />
-        ) : (
-          <Controller
-            control={control}
-            name={`sources.${sourceIdx}.mode_report_token` as const}
-            render={({ field }) => (
-              <ReadonlyValue mono>{field.value}</ReadonlyValue>
-            )}
-          />
-        )}
-        <FieldError message={sourceErrors?.mode_report_token?.message} />
+        {(() => {
+          const fieldName = `sources.${sourceIdx}.mode_report_token`;
+          const showErr = shouldShowError(fieldName);
+          return (
+            <>
+              {isEditing ? (
+                <Input
+                  id={`mode_report_${sourceIdx}`}
+                  className="font-mono"
+                  {...register(`sources.${sourceIdx}.mode_report_token` as const)}
+                  aria-invalid={
+                    showErr && !!sourceErrors?.mode_report_token
+                  }
+                />
+              ) : (
+                <Controller
+                  control={control}
+                  name={`sources.${sourceIdx}.mode_report_token` as const}
+                  render={({ field }) => (
+                    <ReadonlyValue mono>{field.value}</ReadonlyValue>
+                  )}
+                />
+              )}
+              {showErr && (
+                <FieldError message={sourceErrors?.mode_report_token?.message} />
+              )}
+            </>
+          );
+        })()}
       </div>
 
       <div className="mt-4">
-        <LabelRow hint={{ text: FIELD_HELP.query_token, label: "Queries" }}>
+        <LabelRow
+          hint={{ text: FIELD_HELP.query_token, label: "Queries" }}
+          required
+        >
           Queries
         </LabelRow>
         <div className="mt-2 flex flex-col gap-2">
           {queries.fields.map((queryField, qIdx) => {
             const queryErrors = sourceErrors?.queries?.[qIdx];
+            const tokenName = `sources.${sourceIdx}.queries.${qIdx}.token`;
+            const showTokenErr = shouldShowError(tokenName);
             return (
               <div
                 key={queryField.id}
@@ -244,7 +283,7 @@ function SourceCard({
                       {...register(
                         `sources.${sourceIdx}.queries.${qIdx}.token` as const
                       )}
-                      aria-invalid={!!queryErrors?.token}
+                      aria-invalid={showTokenErr && !!queryErrors?.token}
                     />
                   ) : (
                     <Controller
@@ -259,7 +298,9 @@ function SourceCard({
                       )}
                     />
                   )}
-                  <FieldError message={queryErrors?.token?.message} />
+                  {showTokenErr && (
+                    <FieldError message={queryErrors?.token?.message} />
+                  )}
                 </div>
 
                 <label className="flex shrink-0 items-center gap-2 pt-2 text-sm text-zinc-700">
@@ -331,7 +372,7 @@ export function BriefForm(props: Props) {
     reset,
     control,
     trigger,
-    formState: { errors, isValid },
+    formState: { errors, isValid, touchedFields, isSubmitted },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues,
@@ -341,6 +382,11 @@ export function BriefForm(props: Props) {
   useEffect(() => {
     void trigger();
   }, [trigger]);
+
+  const shouldShowError = (name: string): boolean => {
+    if (isSubmitted) return true;
+    return touchedAtPath(touchedFields, name);
+  };
 
   const sources = useFieldArray({ control, name: "sources" });
 
@@ -487,15 +533,22 @@ export function BriefForm(props: Props) {
         <LabelRow
           htmlFor="name"
           hint={{ text: FIELD_HELP.name, label: "Brief Name" }}
+          required
         >
           Brief Name
         </LabelRow>
         {isEditing ? (
-          <Input id="name" {...register("name")} aria-invalid={!!errors.name} />
+          <Input
+            id="name"
+            {...register("name")}
+            aria-invalid={shouldShowError("name") && !!errors.name}
+          />
         ) : (
           <ReadonlyValue>{brief.name}</ReadonlyValue>
         )}
-        <FieldError message={errors.name?.message} />
+        {shouldShowError("name") && (
+          <FieldError message={errors.name?.message} />
+        )}
       </div>
 
       <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
@@ -516,6 +569,7 @@ export function BriefForm(props: Props) {
                 isEditing={isEditing}
                 onRemoveSource={() => sources.remove(sIdx)}
                 canRemoveSource={sources.fields.length > 1}
+                shouldShowError={shouldShowError}
               />
             ))}
             {isEditing && (
@@ -542,6 +596,7 @@ export function BriefForm(props: Props) {
           <LabelRow
             htmlFor="prompt"
             hint={{ text: FIELD_HELP.prompt, label: "Prompt" }}
+            required
           >
             Prompt
           </LabelRow>
@@ -551,14 +606,16 @@ export function BriefForm(props: Props) {
               rows={20}
               className="font-mono text-sm"
               {...register("prompt")}
-              aria-invalid={!!errors.prompt}
+              aria-invalid={shouldShowError("prompt") && !!errors.prompt}
             />
           ) : (
             <pre className="mt-2 max-h-[40rem] overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-3 font-mono text-sm text-zinc-900 whitespace-pre-wrap">
               {brief.prompt}
             </pre>
           )}
-          <FieldError message={errors.prompt?.message} />
+          {shouldShowError("prompt") && (
+            <FieldError message={errors.prompt?.message} />
+          )}
         </div>
       </section>
 
@@ -567,51 +624,34 @@ export function BriefForm(props: Props) {
           Outputs
         </h2>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <LabelRow
-              htmlFor="schedule"
-              hint={{ text: FIELD_HELP.schedule, label: "Schedule" }}
-            >
-              Schedule
-            </LabelRow>
-            {isEditing ? (
-              <Input
-                id="schedule"
-                className="font-mono"
-                {...register("schedule")}
-                aria-invalid={!!errors.schedule}
-              />
-            ) : (
-              <ReadonlyValue mono>{brief.schedule}</ReadonlyValue>
-            )}
+        <div>
+          <LabelRow
+            htmlFor="schedule"
+            hint={{ text: FIELD_HELP.schedule, label: "Schedule" }}
+            required
+          >
+            Schedule
+          </LabelRow>
+          {isEditing ? (
+            <Input
+              id="schedule"
+              className="font-mono"
+              {...register("schedule")}
+              aria-invalid={shouldShowError("schedule") && !!errors.schedule}
+            />
+          ) : (
+            <ReadonlyValue mono>{brief.schedule}</ReadonlyValue>
+          )}
+          {shouldShowError("schedule") && (
             <FieldError message={errors.schedule?.message} />
-          </div>
-
-          <div>
-            <LabelRow
-              htmlFor="timezone"
-              hint={{ text: FIELD_HELP.timezone, label: "Time Zone" }}
-            >
-              Time Zone
-            </LabelRow>
-            {isEditing ? (
-              <Input
-                id="timezone"
-                {...register("timezone")}
-                aria-invalid={!!errors.timezone}
-              />
-            ) : (
-              <ReadonlyValue mono>{brief.timezone}</ReadonlyValue>
-            )}
-            <FieldError message={errors.timezone?.message} />
-          </div>
+          )}
         </div>
 
         <div>
           <LabelRow
             htmlFor="slack_channel"
             hint={{ text: FIELD_HELP.slack_channel, label: "Slack Channel" }}
+            required
           >
             Slack Channel
           </LabelRow>
@@ -620,12 +660,16 @@ export function BriefForm(props: Props) {
               id="slack_channel"
               className="font-mono"
               {...register("slack_channel")}
-              aria-invalid={!!errors.slack_channel}
+              aria-invalid={
+                shouldShowError("slack_channel") && !!errors.slack_channel
+              }
             />
           ) : (
             <ReadonlyValue mono>#{brief.slack_channel}</ReadonlyValue>
           )}
-          <FieldError message={errors.slack_channel?.message} />
+          {shouldShowError("slack_channel") && (
+            <FieldError message={errors.slack_channel?.message} />
+          )}
         </div>
       </section>
 
