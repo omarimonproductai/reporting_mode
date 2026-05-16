@@ -7,15 +7,17 @@ import {
   Controller,
   useFieldArray,
   useForm,
+  useWatch,
   type Control,
   type FieldErrors,
-  type UseFormRegister,
 } from "react-hook-form";
 import { toast } from "sonner";
 import { Info, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ChannelCombobox } from "@/components/ChannelCombobox";
+import { QueryCombobox } from "@/components/QueryCombobox";
+import { ReportCombobox } from "@/components/ReportCombobox";
 import { CronBuilder } from "@/components/CronBuilder";
 import {
   Dialog,
@@ -188,7 +190,6 @@ function ReadonlyValue({
 type SourceCardProps = {
   sourceIdx: number;
   control: Control<FormValues>;
-  register: UseFormRegister<FormValues>;
   errors: FieldErrors<FormValues>;
   isEditing: boolean;
   onRemoveSource: () => void;
@@ -199,7 +200,6 @@ type SourceCardProps = {
 function SourceCard({
   sourceIdx,
   control,
-  register,
   errors,
   isEditing,
   onRemoveSource,
@@ -210,6 +210,14 @@ function SourceCard({
     control,
     name: `sources.${sourceIdx}.queries`,
   });
+
+  // Watched so the per-query combobox below can scope its list to the
+  // queries that belong to this source's report. When the user changes
+  // the report, the watched value updates and the comboboxes refilter.
+  const watchedReportToken = useWatch({
+    control,
+    name: `sources.${sourceIdx}.mode_report_token` as const,
+  }) ?? "";
 
   const sourceErrors = errors.sources?.[sourceIdx];
 
@@ -249,13 +257,18 @@ function SourceCard({
           return (
             <>
               {isEditing ? (
-                <Input
-                  id={`mode_report_${sourceIdx}`}
-                  className="font-mono"
-                  {...register(`sources.${sourceIdx}.mode_report_token` as const)}
-                  aria-invalid={
-                    showErr && !!sourceErrors?.mode_report_token
-                  }
+                <Controller
+                  control={control}
+                  name={`sources.${sourceIdx}.mode_report_token` as const}
+                  render={({ field }) => (
+                    <ReportCombobox
+                      value={field.value}
+                      onChange={field.onChange}
+                      ariaInvalid={
+                        showErr && !!sourceErrors?.mode_report_token
+                      }
+                    />
+                  )}
                 />
               ) : (
                 <Controller
@@ -293,13 +306,19 @@ function SourceCard({
               >
                 <div className="flex-1">
                   {isEditing ? (
-                    <Input
-                      className="font-mono"
-                      placeholder="Query token"
-                      {...register(
+                    <Controller
+                      control={control}
+                      name={
                         `sources.${sourceIdx}.queries.${qIdx}.token` as const
+                      }
+                      render={({ field }) => (
+                        <QueryCombobox
+                          value={field.value}
+                          onChange={field.onChange}
+                          reportToken={watchedReportToken}
+                          ariaInvalid={showTokenErr && !!queryErrors?.token}
+                        />
                       )}
-                      aria-invalid={showTokenErr && !!queryErrors?.token}
                     />
                   ) : (
                     <Controller
@@ -592,7 +611,6 @@ export function BriefForm(props: Props) {
                 key={sourceField.id}
                 sourceIdx={sIdx}
                 control={control}
-                register={register}
                 errors={errors}
                 isEditing={isEditing}
                 onRemoveSource={() => sources.remove(sIdx)}
