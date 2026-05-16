@@ -1,5 +1,6 @@
 import "server-only";
 import { listBriefs, readBrief } from "@/lib/github";
+import { fetchLatestRuns, type RunLookup } from "@/lib/runs";
 import type { BriefListItem } from "@/lib/schemas";
 import { parseBrief } from "@/lib/yaml";
 
@@ -31,4 +32,21 @@ export async function getBriefList(): Promise<BriefListItem[]> {
   const briefs = items.filter((item): item is BriefListItem => item !== null);
   briefs.sort((a, b) => a.name.localeCompare(b.name, "ca"));
   return briefs;
+}
+
+export type BriefListItemWithRun = BriefListItem & { run: RunLookup };
+
+export async function getBriefListWithRuns(): Promise<BriefListItemWithRun[]> {
+  const briefs = await getBriefList();
+  let runs: Map<string, RunLookup>;
+  try {
+    runs = await fetchLatestRuns(briefs.map((b) => b.filename));
+  } catch (err) {
+    console.error("Failed to fetch latest runs for sidebar:", err);
+    runs = new Map();
+  }
+  return briefs.map((b) => ({
+    ...b,
+    run: runs.get(b.filename) ?? { kind: "never-run" },
+  }));
 }

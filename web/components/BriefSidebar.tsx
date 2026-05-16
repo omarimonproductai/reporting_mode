@@ -2,13 +2,13 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { BriefSidebarList } from "@/components/BriefSidebarList";
 import { Button } from "@/components/ui/button";
-import { getBriefList } from "@/lib/briefs";
+import { getBriefListWithRuns, type BriefListItemWithRun } from "@/lib/briefs";
 
 export async function BriefSidebar() {
-  let briefs;
+  let briefs: BriefListItemWithRun[] = [];
   let errorMessage: string | null = null;
   try {
-    briefs = await getBriefList();
+    briefs = await getBriefListWithRuns();
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : "Unknown error";
   }
@@ -27,7 +27,7 @@ export async function BriefSidebar() {
           No s&apos;han pogut carregar els briefs: {errorMessage}
         </div>
       ) : (
-        <BriefSidebarList briefs={briefs ?? []} />
+        <BriefSidebarList briefs={briefs} />
       )}
     </div>
   );

@@ -402,9 +402,9 @@ def post_brief_to_slack(brief, sources_data, brief_text):
         print(f"   ✓ {filename} ({len(rows)} files)")
 
 
-def save_artifacts(brief, sources_data, brief_text):
+def save_artifacts(brief, brief_path, sources_data, brief_text):
     OUT_DIR.mkdir(exist_ok=True)
-    slug = re.sub(r"[^a-z0-9]+", "-", brief["name"].lower()).strip("-")
+    slug = brief_slug_from_path(brief_path)
     raw = {
         "brief": brief["name"],
         "generated_at": date.today().isoformat(),
@@ -425,22 +425,28 @@ def save_artifacts(brief, sources_data, brief_text):
     (OUT_DIR / f"{slug}.brief.md").write_text(brief_text, encoding="utf-8")
 
 
-def brief_slug(name):
-    """Same slug rule as save_artifacts uses for filenames; kept as a
-    standalone helper so write_run_record can name files identically.
+def brief_slug_from_path(brief_path):
+    """Filename-based slug for execution artifacts.
+
+    The slug used for out/<slug>.run.json (and <slug>.raw.json /
+    <slug>.brief.md) is derived from the brief YAML's filename, NOT from
+    brief["name"]. Reason: filenames are stable across renames, while
+    brief.name can be edited freely from the web app. The web app's
+    /api/runs/[brief] looks up artifacts using the same filename slug,
+    so the two sides stay aligned.
     """
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return Path(brief_path).stem
 
 
-def write_run_record(brief, state):
+def write_run_record(brief, brief_path, state):
     """Write the per-execution status JSON read later by the web app.
 
     The web app (task 4.6) fetches the most recent artifact named
-    run-<slug>-* and parses this file to render the ExecutionMetadata
-    card. Schema must stay stable.
+    run-<filename-slug>-* or runs-due-* and parses this file to render
+    the ExecutionMetadata card. Schema must stay stable.
     """
     OUT_DIR.mkdir(exist_ok=True)
-    slug = brief_slug(brief["name"])
+    slug = brief_slug_from_path(brief_path)
     record = {
         "brief": brief["name"],
         "started_at": state["started_at"],
@@ -496,7 +502,7 @@ def main():
             f"total={usage['total']}"
         )
 
-        save_artifacts(brief, sources_data, brief_text)
+        save_artifacts(brief, brief_path, sources_data, brief_text)
 
         print("")
         print("=" * 70)
@@ -520,7 +526,7 @@ def main():
     finally:
         state["finished_at"] = datetime.now(timezone.utc).isoformat()
         try:
-            write_run_record(brief, state)
+            write_run_record(brief, brief_path, state)
         except Exception as werr:
             # Don't shadow the original failure if we can't write the record
             print(f"WARNING: no s'ha pogut escriure el run record: {werr}")

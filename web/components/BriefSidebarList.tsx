@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import type { BriefListItem } from "@/lib/schemas";
+import type { BriefListItemWithRun } from "@/lib/briefs";
+import type { RunLookup } from "@/lib/runs";
 
-export function BriefSidebarList({ briefs }: { briefs: BriefListItem[] }) {
+export function BriefSidebarList({
+  briefs,
+}: {
+  briefs: BriefListItemWithRun[];
+}) {
   const pathname = usePathname();
 
   if (briefs.length === 0) {
@@ -26,17 +31,80 @@ export function BriefSidebarList({ briefs }: { briefs: BriefListItem[] }) {
             <Link
               href={href}
               className={cn(
-                "block rounded-md px-2 py-1.5 text-sm text-zinc-700 transition-colors",
+                "flex flex-col gap-0.5 rounded-md px-2 py-1.5 text-sm text-zinc-700 transition-colors",
                 isActive
                   ? "bg-zinc-100 font-medium text-zinc-900"
                   : "hover:bg-zinc-100"
               )}
             >
-              {brief.name}
+              <div className="flex items-center gap-1.5">
+                <StatusIcon run={brief.run} />
+                <span className="truncate">{brief.name}</span>
+              </div>
+              <RunMeta run={brief.run} />
             </Link>
           </li>
         );
       })}
     </ul>
   );
+}
+
+function StatusIcon({ run }: { run: RunLookup }) {
+  if (run.kind === "never-run") {
+    return (
+      <span
+        className="size-2 shrink-0 rounded-full bg-zinc-300"
+        aria-label="Mai executat"
+        title="Mai executat"
+      />
+    );
+  }
+  const ok = run.record.status === "success";
+  return (
+    <span
+      className={cn(
+        "size-2 shrink-0 rounded-full",
+        ok ? "bg-emerald-500" : "bg-red-500"
+      )}
+      aria-label={ok ? "Last run: success" : "Last run: failed"}
+      title={ok ? "Last run: success" : "Last run: failed"}
+    />
+  );
+}
+
+function RunMeta({ run }: { run: RunLookup }) {
+  if (run.kind === "never-run") {
+    return <span className="pl-3.5 text-[11px] text-zinc-400">Mai executat</span>;
+  }
+  const r = run.record;
+  const when = relativeTime(r.finished_at ?? r.started_at);
+  const tokens = r.tokens;
+  return (
+    <span className="flex items-center gap-2 pl-3.5 text-[11px] text-zinc-500">
+      <span>{when}</span>
+      {tokens && (
+        <span className="font-mono text-zinc-400">
+          {formatK(tokens.input)} + {formatK(tokens.output)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function relativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return "—";
+  const m = Math.floor(ms / 60_000);
+  if (m < 1) return "ara mateix";
+  if (m < 60) return `fa ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `fa ${h}h`;
+  const d = Math.floor(h / 24);
+  return `fa ${d}d`;
+}
+
+function formatK(n: number): string {
+  if (n < 1000) return `${n}`;
+  return `${(n / 1000).toFixed(1)}k`;
 }
