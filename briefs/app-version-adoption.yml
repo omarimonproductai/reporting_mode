@@ -1,5 +1,5 @@
 name: App Version Adoption 2 CH00
-published: false
+published: true
 schedule: 0 10 * * *
 slack_channel: test-github-oriol
 reference_link: https://app.mode.com/ecooltra706/reports/7340a3e1f57c
