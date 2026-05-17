@@ -5,8 +5,7 @@ sources:
   - mode_report_token: bd8b5c4d3c80
     queries:
       - token: e81413b503a4
-        csv: false
+        csv: true
 prompt: |
-  Llista els valors en format taula.
-  Els valors de la columna <rental url> en format link amb el seu tag html corresponent i al costat indica quants minuts fa que el rental està en marxa fent un càlcul de la diferència entre created i el moment de lectura de les dades (tot sempre en horari Europe/Belgium) 
+  Llista només la columna <rental url> en format link amb el seu tag html corresponent i al costat indica en format hores quants minuts fa que el rental està en marxa fent un càlcul de la diferència entre created i el moment de lectura de les dades (tot sempre en horari Europe/Belgium). Aesegura't que el format del link es correcte.
 owner_email: null
