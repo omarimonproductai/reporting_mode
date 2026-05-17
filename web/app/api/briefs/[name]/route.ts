@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { getBriefList } from "@/lib/briefs";
 import {
   BriefNotFoundError,
   deleteBrief,
@@ -54,6 +55,29 @@ export async function PUT(
       { error: "Invalid brief payload", issues: parsed.error.issues },
       { status: 400 }
     );
+  }
+
+  // Reject renaming this brief to a `name` that another brief
+  // already uses. The filename never changes on edit (we keep the
+  // slug fixed at create time) so the YAML name is the only
+  // unique-per-display handle the user controls post-create.
+  // Without this check, two briefs could end up with the same name
+  // in the sidebar and operators couldn't tell them apart.
+  try {
+    const existing = await getBriefList();
+    const clash = existing.find(
+      (b) => b.name === parsed.data.name && b.filename !== name
+    );
+    if (clash) {
+      return NextResponse.json(
+        {
+          error: `Ja existeix un brief amb el nom «${parsed.data.name}» (${clash.filename}.yml). Tria un nom diferent.`,
+        },
+        { status: 409 }
+      );
+    }
+  } catch {
+    // Don't fail the edit if list-lookup itself fails.
   }
 
   try {

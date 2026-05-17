@@ -5,6 +5,7 @@ type RawQuery = string | { token: string; csv?: boolean };
 type RawSource = { mode_report_token: string; queries: RawQuery[] };
 type RawBrief = {
   name: string;
+  published?: unknown;
   schedule: string;
   slack_channel: string;
   reference_link?: string | null;
@@ -31,8 +32,16 @@ export function parseBrief(content: string): Brief {
     ),
   }));
 
+  // Legacy briefs predate task 16.0 and lack the `published` field; treat
+  // them as published so the cron behaviour they had before the migration
+  // commit lands is preserved. Anything other than the literal `false`
+  // value also reads as published — defensive against accidental typos
+  // (e.g. `published: "false"` as a YAML string).
+  const published = raw.published === false ? false : true;
+
   return briefSchema.parse({
     name: raw.name,
+    published,
     schedule: raw.schedule,
     slack_channel: raw.slack_channel,
     reference_link: raw.reference_link ?? "",
@@ -45,6 +54,7 @@ export function parseBrief(content: string): Brief {
 export function serializeBrief(brief: Brief): string {
   const ordered: Record<string, unknown> = {
     name: brief.name,
+    published: brief.published,
     schedule: brief.schedule,
     slack_channel: brief.slack_channel,
   };

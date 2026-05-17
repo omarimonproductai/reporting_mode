@@ -480,3 +480,105 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
   - [x] 15.5 Plumb the query params through to the detail page. `web/app/briefs/[name]/page.tsx` accepts `searchParams: Promise<{ edit?: string; history?: string }>`, reads `edit === "1"` and `history === "1"`, passes `initialMode="edit"` (or undefined) to `<BriefForm>` and `initialOpen={true}` (or undefined) to `<HistoryDrawerButton>`. The page is backwards-compatible for direct navigation without params.
   - [x] 15.6 `BriefForm` accepts a new optional `initialMode?: FormMode` prop. State init becomes `useState<FormMode>(isCreate ? "edit" : (props.initialMode ?? "view"))`. `HistoryDrawerButton` accepts a new optional `initialOpen?: boolean` prop. State init becomes `useState(initialOpen)` and a `useEffect` (empty-deps) fires the outputs fetch on mount when `initialOpen` is true (otherwise the drawer opens visibly empty for a beat before the click handler kicks in the load).
   - [x] 15.7 Smoke test on Vercel preview (the convention's standard MVP gate, no automated tests). Initial validation on the preview surfaced the `preventDefault()` bug on the kebab's `PopoverTrigger asChild` — the menu was visible-but-unresponsive because Radix's `composeEventHandlers` short-circuits its own open handler when the child's onClick calls `preventDefault()`. Fix shipped in PR #60. Production verification after the fix landed: kebab opens on click, Edit lands on `?edit=1` with the form in edit mode, History opens the drawer on `?history=1`, Run Now from the kebab shares the header button's cooldown. Hover/focus visibility unchanged from the preview-stage observations.
+
+- [ ] **16.0 Publish / Unpublish brief** — PRD §4 «Publish / Unpublish brief» + §7 «Publish / Unpublish brief». Branch `feature/16.0-publish-unpublish` (already created). Decisions recorded with user 2026-05-17: 1.A priority before Mode data preview (task 17.0), 2.B new briefs default to Draft, 3.C Run Now asks confirmation when brief is Draft, 4.A+B+D three UI surfaces (sidebar opacity+chip, /schedule draft-styled rows, detail page prominent toggle). **Migration** (sub-task 16.2) MUST land in the same PR as the schema change — landing the schema without the migration would leave existing briefs without an explicit `published` field, and a tolerant `parseBrief` default of `true` is the only safety net during the brief window. **Operator action**: none required in this task — no new env var, no new shadcn primitive beyond `switch` which the implementer installs.
+
+  - [x] 16.1 Schema + serializer changes to introduce the `published` field.
+    - `web/lib/schemas.ts`: extend `briefSchema` with `published: z.boolean()`. **No `.default(true)` on the zod schema** — RHF input/output types diverge when zod adds defaults and the existing form code reads `published` directly. The default-true tolerance lives in `parseBrief` (next bullet), not zod.
+    - `web/lib/yaml.ts:parseBrief`: when the parsed YAML lacks `published` (or it's not a boolean), normalise to `true`. Legacy briefs without the field round-trip cleanly even before the migration commit (16.2) lands.
+    - `web/lib/yaml.ts:serializeBrief`: emit `published: <bool>` explicitly in every YAML, never omit. Insert the key into the canonical `EMITTED_KEYS` order **immediately after `name`** so the field is the first thing the human reader sees.
+    - `EMPTY_BRIEF` (the default used by `/briefs/new`): `published: false`. Drafts-by-default for new briefs (decision 2.B).
+
+  - [x] 16.2 Bulk migration commit: assign `published: true` to every existing brief in `briefs/*.yml`.
+    - One-shot script `scripts/add_published_field.py` that walks `briefs/*.yml`, parses with `pyyaml`, sets the key idempotently (only adds when missing, never overwrites), writes back preserving key order via `pyyaml`'s `sort_keys=False`. Run locally with `python scripts/add_published_field.py`.
+    - **Delete the script in the same PR** — it's single-use migration code, not operational. The migration is in the git history forever, but the file doesn't stay in the repo.
+    - Commit message: «chore(briefs): bulk-assign `published: true` to existing briefs (rollout for task 16.0)».
+    - Verification: `grep -L "^published:" briefs/*.yml` returns zero lines. The migration commit lands BEFORE the scheduler filter (16.3) so there's no window where existing briefs read as Draft.
+
+  - [x] 16.3 Scheduler filter + observability update at `web/app/api/scheduler/tick/route.ts`.
+    - Add `const candidates = briefs.filter((b) => b.published !== false);` immediately after the `parseBrief` loop and BEFORE the `isDue()` evaluation.
+    - Compute `const skipped_draft = briefs.length - candidates.length;`.
+    - Extend the JSON response shape to include `skipped_draft` (alongside `scanned`, `due`, `dispatched`, `failures`).
+    - Extend the structured `console.log` payload (`event: "scheduler.tick"`) with the same `skipped_draft` field so operators can see draft volume in Vercel Function Logs without parsing YAML.
+    - Smoke-test via `curl -H "Authorization: Bearer $CRON_SECRET" https://<preview>.vercel.app/api/scheduler/tick`: expect `skipped_draft` to match the count of `published: false` briefs in the repo at the time of the call (manually count via `grep -c "^published: false" briefs/*.yml`).
+    - **No `due_runner.py` change** — that file was deleted in task 14.0; the Python codepath no longer participates in scheduling decisions.
+
+  - [x] 16.4 Install the shadcn `switch` primitive: `cd web && npx shadcn@latest add switch`. Only new shadcn primitive in this task. Verify the install added `web/components/ui/switch.tsx` and updated `components.json`.
+
+  - [x] 16.5 New `web/components/PublishedToggle.tsx` (client component) wrapping the shadcn `<Switch>`.
+    - Props: `{ control: Control<BriefForm>, mode: FormMode }` (or accept `{ value, onChange, disabled }` if preferred — the existing components use both styles).
+    - Wire via `<Controller>` from RHF: `name="published"`, `render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} disabled={mode === "view"} />}`.
+    - Label rendered to the right of the Switch: **«Published»** when on (no special style), **«Draft»** when off (`text-zinc-500`). Both labels in English (chrome). No localised narrative on the toggle itself — the badge in 16.6 carries the at-a-glance signal.
+    - Size: matches the existing title-row toolbar buttons (`size="sm"` equivalent — `h-9`, vertically centered).
+
+  - [x] 16.6 New `web/components/PublishedBadge.tsx` (server component, accepts `{ published: boolean }`).
+    - `Published` variant: `bg-emerald-50 text-emerald-700 border border-emerald-200`, uppercase text-[10px] font-mono, rounded.
+    - `Draft` variant: `bg-zinc-100 text-zinc-600 border border-zinc-200`, same shape.
+    - Mounted in `web/app/briefs/[name]/page.tsx`'s title rendering (next to the brief name, before the loaded-at indicator). Server-rendered from the parsed brief so the badge is visible immediately on landing — no client hydration flash. The page already parses the brief; just thread the `published` field through to the title block.
+    - **NOT mounted on `/briefs/new`** — there's no saved state to display; the toggle alone carries the meaning at the create stage.
+
+  - [x] 16.7 Mount `<PublishedToggle>` in `BriefForm.tsx`'s title-row toolbar.
+    - Position: **immediately to the LEFT of the Run Now button** in both view and edit modes. When Run Now is absent (e.g. on `/briefs/new`), the toggle still renders in the same horizontal slot.
+    - In view mode the toggle is read-only (the `disabled={mode === "view"}` from 16.5); a click-and-toggle in view mode does NOT enter edit mode — same UX as clicking other read-only form fields. Users explicitly enter edit mode via the Edit button.
+    - In edit mode the toggle is interactive; the new value is part of the RHF form state and ships with Save.
+    - On `/briefs/new`, the toggle renders interactive from initial render (the create form is always in edit mode). Initial value comes from `EMPTY_BRIEF.published = false` (set in 16.1).
+
+  - [x] 16.8 Propagate `published` through `web/lib/briefs.ts:getBriefListWithRuns()` so it reaches the sidebar and `/schedule` row builders.
+    - Extend `BriefListItem` (defined in `web/lib/schemas.ts`) with `published: boolean`.
+    - `getBriefList()` and `getBriefListWithRuns()` already parse each brief; just include `published` in the projected row shape.
+    - No new fetch — `published` is in the same YAML body that `parseBrief` already produces.
+
+  - [x] 16.9 New `web/components/DraftChip.tsx` (server component, no props or just `{ className? }` for layout adjustments).
+    - Renders the inline chip used by sidebar + `/schedule`: «Draft» in `font-mono text-[10px] text-zinc-500 bg-zinc-100 border border-zinc-200 rounded px-1 py-px`.
+    - `shrink-0` baked into the default className so consumers don't have to remember; truncation behaviour around it is the consumer's responsibility (sidebar's `truncate` on the parent works as-is).
+    - Pure presentational — no client hooks, no state.
+
+  - [x] 16.10 `BriefSidebarList.tsx`: draft styling.
+    - Add conditional `opacity-60` to the row wrapper when `!published` (using the existing `cn(...)` call site for the row).
+    - Render `<DraftChip />` inline after the brief name and BEFORE the kebab placeholder, inside the same `<Link>` so the chip respects the row's hit area.
+    - Existing tooltip on truncated names continues to wrap only the `<Link>`, not the chip or kebab — no change there.
+    - The dot-status (success/failed/never-run) and token badge stay at FULL opacity — they describe the last run, which is meaningful even for drafts. Apply `opacity-60` to the name + chip only, not to those secondary elements.
+
+  - [x] 16.11 `web/app/schedule/page.tsx` / `ScheduleTable`: draft styling.
+    - The «Brief» column: same `opacity-60` + `<DraftChip />` treatment as the sidebar (16.10). The link to `/briefs/<filename>` remains clickable at full hit area.
+    - The «Proper enviament» column for draft rows: wrap the cell in a shadcn `<Tooltip>` whose body is «Aquest brief està despublicat — el cron no s'aplicarà fins que es publiqui». Cell content stays the same (the computed next-fire time + relative «en Xh») but renders at `opacity-60` to match the visual rhythm.
+    - The «Schedule» and «Última run» columns: unchanged styling — same data either way; the user might be referring to «when was this draft last run during testing» which is real information.
+    - Sort order unchanged: drafts mix with published in the same alphabetical/chronological partition; no separate «Drafts» section.
+
+  - [x] 16.12 New `web/components/DraftRunConfirmDialog.tsx` (client component) — the shared confirmation dialog used by both Run Now call-sites.
+    - shadcn `<Dialog>` (already installed; mounted at root via `TooltipProvider` etc.).
+    - Props: `{ open: boolean, onOpenChange: (open: boolean) => void, onConfirm: () => void, briefName?: string }`.
+    - Title: «Brief despublicat» (Catalan narrative — this is feedback, not chrome).
+    - Body: «Aquest brief està en mode Draft — el cron no l'executa automàticament. Vols executar-lo manualment ara?». If `briefName` is provided, render it bolded in the body for context.
+    - Buttons: **«Cancel»** (outline variant, default focus) + **«Run anyway»** (primary). Run anyway calls `onConfirm()` and lets the parent close the dialog via `onOpenChange(false)` so the parent stays in control of subsequent state (cooldown start, toast, etc.).
+    - Pressing Escape OR clicking outside dismisses (standard Radix behaviour, equivalent to Cancel — no `onConfirm` fires).
+
+  - [x] 16.13 `RunNowButton.tsx` (header) draft-confirmation wiring.
+    - Component accepts a new prop `published?: boolean` (default `true` for backwards-safety: if a caller forgets to pass it, the button behaves as published). The detail-page caller passes the brief's actual `published` value.
+    - Local state `[confirmOpen, setConfirmOpen] = useState(false)`.
+    - When the user clicks the button: if `published === false`, set `confirmOpen=true` and do NOT dispatch yet. Otherwise, dispatch immediately (today's behaviour).
+    - Render `<DraftRunConfirmDialog open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={() => { setConfirmOpen(false); dispatch(); }} briefName={...} />` at the bottom of the JSX tree.
+    - The 2-minute cooldown applies AFTER the user confirms — the dialog itself is not gated by the cooldown predicate. A second click within the cooldown window returns the existing HTTP 429 toast.
+
+  - [x] 16.14 `BriefRowMenu.tsx` (kebab) draft-confirmation wiring.
+    - Same prop addition: `published?: boolean` (default `true`).
+    - Sidebar list propagation: `BriefSidebarList.tsx` now receives `published` per row (from 16.8) — pass it down to each `<BriefRowMenu published={...} />`.
+    - When the user clicks the «Run Now» menu item: identical logic to 16.13 (open dialog when `!published`, otherwise dispatch). Reuses the same `<DraftRunConfirmDialog>` component.
+    - The dialog and the popover MUST coexist visually — the popover closes (Radix standard outside-click on dialog open) and the dialog covers the page. Smoke test that opening the dialog from the kebab doesn't leave a stranded popover open.
+
+  - [ ] 16.15 Smoke test on Vercel preview (the project's standard MVP gate; no automated tests). Checklist:
+    1. Create new brief via `/briefs/new`: verify the form initial state shows the toggle OFF (Draft) and the YAML committed contains `published: false`. Cancel the create flow → no commit, no draft saved.
+    2. Toggle published ON inside the create flow, Create: verify the YAML contains `published: true` and the page header shows the green Published badge.
+    3. Edit an existing brief → toggle Published OFF → Save: verify the YAML now has `published: false`, the sidebar row renders at opacity-60 with the Draft chip, `/schedule` shows the row draft-styled with the Tooltip on the next-fire cell.
+    4. Toggle back ON: verify visual state reverses; the scheduler should pick the brief up on the next 5-min tick.
+    5. Click Run Now (header) on a draft: dialog appears with title «Brief despublicat», Cancel does nothing (no dispatch, no toast), Run anyway dispatches and the existing success toast / GitHub Actions link surfaces normally.
+    6. Open the sidebar kebab on a draft → Run Now: same dialog flow as (5).
+    7. Click Run Now on a published brief: NO dialog, direct dispatch (today's behaviour preserved).
+    8. Hit `/api/scheduler/tick` via curl with the bearer token: response `skipped_draft` matches the manual count of drafts in `briefs/*.yml`. Vercel Function Logs surface the same number in the structured `console.log` line.
+    9. After ~5-10 min of the preview branch existing with at least one draft, verify no Slack post for that draft appears in the test channel even though its cron would have matched.
+
+  - [ ] 16.16 README roadmap + final docs sync.
+    - Append to the Roadmap section: «16.0 ✅ Publish/Unpublish briefs — Draft state gates the cron auto-dispatch; new briefs default to Draft; Run Now requires confirmation when dispatching a draft.».
+    - Mark every 16.x sub-task `[x]` in this file as it completes; on full ship, change the 16.0 parent task header to `- [x] **16.0 Publish / Unpublish brief** ✅`.
+    - **No PRD edits at this stage** — the PRD already reflects the shipped state via the bloc landed in commit `035654c`. If implementation surfaces a deviation from PT1-PT11, document it inline alongside the deviating sub-task and add a «deviation» note to the PRD ribbon as the convention requires (see how task 4.0's 4.11 «post-4.0 polish» block did it).
+

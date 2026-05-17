@@ -14,6 +14,7 @@ export async function getBriefList(): Promise<BriefListItem[]> {
         return {
           filename: file.filename,
           name: brief.name,
+          published: brief.published,
           schedule: brief.schedule,
           slack_channel: brief.slack_channel,
           source_count: brief.sources.length,

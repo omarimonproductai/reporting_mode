@@ -29,6 +29,7 @@ export async function buildCatalogUsageIndex(): Promise<
         const item: BriefListItem = {
           filename: file.filename,
           name: parsed.name,
+          published: parsed.published,
           schedule: parsed.schedule,
           slack_channel: parsed.slack_channel,
           source_count: parsed.sources.length,

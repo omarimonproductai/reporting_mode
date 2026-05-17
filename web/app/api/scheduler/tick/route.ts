@@ -48,10 +48,20 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const due: string[] = [];
+  let skipped_draft = 0;
   for (const file of files) {
     try {
       const blob = await readBrief(file.filename);
       const brief = parseBrief(blob.content);
+      // Draft briefs are intentionally excluded from auto-dispatch. The
+      // `!== false` shape mirrors parseBrief's default-true tolerance —
+      // a brief without an explicit `published` boolean still reads as
+      // published (defensive against a never-migrated YAML slipping
+      // through).
+      if (brief.published === false) {
+        skipped_draft++;
+        continue;
+      }
       if (isDue(brief.schedule, now)) {
         due.push(file.filename);
       }
@@ -83,6 +93,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     JSON.stringify({
       event: "scheduler.tick",
       scanned: files.length,
+      skipped_draft,
       due: due.length,
       dispatched: dispatched.length,
       failures: failures.length,
@@ -92,6 +103,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   return NextResponse.json({
     scanned: files.length,
+    skipped_draft,
     due,
     dispatched,
     failures,

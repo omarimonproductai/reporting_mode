@@ -16,6 +16,12 @@ import {
   relativeFromPast,
 } from "@/lib/cron";
 import type { BriefListItemWithRun } from "@/lib/briefs";
+import { DraftChip } from "@/components/DraftChip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type ScheduleRow = {
@@ -150,16 +156,36 @@ export function ScheduleTable({ rows }: Props) {
           {sorted.map(({ brief, next }) => (
             <tr key={brief.filename} className="border-t border-zinc-100">
               <td className="px-4 py-3">
-                <Link
-                  href={`/briefs/${brief.filename}`}
-                  className="font-medium text-zinc-900 hover:underline"
-                >
-                  {brief.name}
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/briefs/${brief.filename}`}
+                    className={cn(
+                      "font-medium text-zinc-900 hover:underline",
+                      !brief.published && "opacity-60"
+                    )}
+                  >
+                    {brief.name}
+                  </Link>
+                  {!brief.published && <DraftChip />}
+                </div>
               </td>
               <td className="px-4 py-3">
                 {next ? (
-                  <NextFireCell date={next} />
+                  brief.published ? (
+                    <NextFireCell date={next} />
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-block opacity-60">
+                          <NextFireCell date={next} />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        Aquest brief està despublicat — el cron no
+                        s&apos;aplicarà fins que es publiqui.
+                      </TooltipContent>
+                    </Tooltip>
+                  )
                 ) : (
                   <span className="text-zinc-400">—</span>
                 )}

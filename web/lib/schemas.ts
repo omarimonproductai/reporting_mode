@@ -16,6 +16,7 @@ export const sourceSchema = z.object({
 
 export const briefSchema = z.object({
   name: z.string().min(1, "El Brief Name és obligatori"),
+  published: z.boolean(),
   schedule: z
     .string()
     .min(1, "El Schedule és obligatori")
@@ -39,6 +40,7 @@ export type Brief = z.infer<typeof briefSchema>;
 export type BriefListItem = {
   filename: string;
   name: string;
+  published: boolean;
   schedule: string;
   slack_channel: string;
   source_count: number;

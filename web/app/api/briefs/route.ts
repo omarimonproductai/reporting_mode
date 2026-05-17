@@ -39,6 +39,29 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
+  // Reject duplicate display names across DIFFERENT filenames. The
+  // filename-level collision is caught by writeBrief (422 from
+  // GitHub → BriefAlreadyExistsError below) but two briefs with the
+  // same display name but different slugs (different unicode, accent
+  // variants, etc.) would otherwise both create with confusing
+  // sidebar entries. Check before commit so the user sees a clear
+  // error.
+  try {
+    const existing = await getBriefList();
+    const clash = existing.find((b) => b.name === parsed.data.name);
+    if (clash) {
+      return NextResponse.json(
+        {
+          error: `Ja existeix un brief amb el nom «${parsed.data.name}» (${clash.filename}.yml). Tria un nom diferent.`,
+        },
+        { status: 409 }
+      );
+    }
+  } catch {
+    // Don't fail the create if the list-lookup itself fails — fall
+    // back to the filename-level collision check below.
+  }
+
   try {
     const content = serializeBrief(parsed.data);
     await writeBrief(filename, content);

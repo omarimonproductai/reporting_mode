@@ -50,6 +50,12 @@ type EditProps = {
   // already in edit mode so the user doesn't have to click Edit first.
   // Used by the sidebar kebab's Edit action. Defaults to "view".
   initialMode?: FormMode;
+  // Slot for page-level brief actions (Publish/Unpublish, Run Now,
+  // History, etc.) so they render on the SAME row as the form's
+  // Edit / Cancel + Save buttons — left side form actions, right
+  // side brief actions. Lets the detail page header stay just the
+  // title.
+  briefActions?: React.ReactNode;
 };
 
 type CreateProps = {
@@ -60,12 +66,15 @@ type CreateProps = {
   // string). Empty / undefined means no prefill — start from the
   // empty brief.
   prefillReportToken?: string;
+  // Same slot as on EditProps for create-flow consistency.
+  briefActions?: React.ReactNode;
 };
 
 type Props = EditProps | CreateProps;
 
 const EMPTY_BRIEF: Brief = {
   name: "",
+  published: false,
   schedule: "0 8 * * *",
   slack_channel: "",
   reference_link: "",
@@ -478,6 +487,29 @@ export function BriefForm(props: Props) {
   const [brief, setBrief] = useState(initialBrief);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Re-sync `sha` from props when the server re-renders with a
+  // newer persisted state — e.g. PublishToggleButton mutates the
+  // YAML behind us → router.refresh() → page passes the new
+  // initialSha down. Without this, the form keeps the stale SHA
+  // from initial mount and the next Save / Delete hits GitHub with
+  // a SHA that no longer matches the current blob, surfacing as a
+  // 409 «does not match» error.
+  //
+  // We deliberately do NOT re-sync `brief` state: that would clobber
+  // in-progress user edits whenever a peripheral mutation lands. The
+  // form is the source of truth for the editable fields once mounted;
+  // external mutations only affect non-form state (the `published`
+  // flag, which the form no longer renders since the toggle moved
+  // to a top-level action button).
+  const persistedSha = isCreate ? "" : props.initialSha;
+  useEffect(() => {
+    if (isCreate) return;
+    if (persistedSha && persistedSha !== sha) {
+      setSha(persistedSha);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistedSha]);
+
   const defaultValues = useMemo<FormValues>(() => brief, [brief]);
 
   const {
@@ -643,8 +675,15 @@ export function BriefForm(props: Props) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="flex flex-col items-end gap-1">
-        {actionButtons}
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">{actionButtons}</div>
+          {props.briefActions && (
+            <div className="flex flex-wrap items-center gap-2">
+              {props.briefActions}
+            </div>
+          )}
+        </div>
         {validityHint}
       </div>
 

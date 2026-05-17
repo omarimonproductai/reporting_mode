@@ -242,6 +242,95 @@ M5. **Run Now** from the kebab MUST share the same 2-minute cooldown state as th
 
 (Implementation tracked as **task 15.0** — currently in flight on `feature/sidebar-brief-kebab-menu`. UX decisions recorded with user 2026-05-17: 1.A Edit auto-activated via query param, 2.A Run Now shares cooldown with header, 3.A History auto-opens drawer via query param, 4.B kebab visible only on hover/focus.)
 
+### Publish / Unpublish brief (added 2026-05-17, task 16.0)
+
+Today every brief in `briefs/*.yml` is implicitly active: as soon as the YAML lands on `main`, the Vercel Cron scanner picks it up and the next matching schedule fires a real Slack post. There's no halfway state — to pause a brief without losing its YAML, the user has to either set the schedule to something distant (hacky and forgettable) or delete the brief and re-create it later (loses git history continuity). This subsection adds an explicit **Published / Draft** toggle on every brief that gates whether the cron applies. Drafts stay fully editable, fully Run-Now-able (after a confirmation dialog), and fully visible across the UI — they just don't get auto-dispatched by the scheduler. Confirmed value: lets the user park a half-written brief, iterate the prompt over multiple sessions, and only let the cron pick it up when the brief is genuinely ready.
+
+PT1. Every brief MUST carry a boolean `published` field in its YAML. The field is **explicit in every YAML emitted by the platform** — `serializeBrief` always writes `published: true` or `published: false`, never omits it. Existing briefs missing the field are tolerated by `parseBrief` (legacy compatibility) and treated as `published: true` so behaviour is preserved before the migration commit lands.
+
+PT2. **Migration commit**: as part of the task 16.0 rollout, a one-time commit MUST bulk-add `published: true` to every existing brief in `briefs/*.yml`. Reason: the current state of the world is «everything in the repo is live», and the migration must preserve that. After the migration, *every* brief carries an explicit `published` field. New briefs are the only path that produces drafts by default (see PT9).
+
+PT3. The brief detail view MUST surface a **Published toggle** at the top of the form, in the same title-row toolbar as Run Now and History (immediately to the left of Run Now). UI: a shadcn `Switch` primitive with an English label «Published» and, when off, the label flips to «Draft» in a muted zinc. The Switch reflects the current saved state in view mode (read-only — clicking it requires entering edit mode); in edit mode, the Switch is interactive and the change is staged like any other form field, committed on Save.
+
+PT4. The detail view MUST also surface a **status badge** beside the brief name in the page header (NOT inside the form), visible regardless of view/edit mode:
+    - `Published` — emerald background (`bg-emerald-50 text-emerald-700`), small uppercase text.
+    - `Draft` — zinc background (`bg-zinc-100 text-zinc-600`), same shape.
+    The badge is the user's at-a-glance signal even when the form isn't open; the toggle is the *action* to change it. Two surfaces, one for read, one for write — same pattern as the rest of the form.
+
+PT5. The sidebar (`BriefSidebar` / `BriefSidebarList`) MUST visually de-emphasise drafts:
+    - Row text rendered with `opacity-60` (the same opacity already used for disabled affordances elsewhere).
+    - A small `Draft` chip rendered after the brief name (font-mono `text-[10px]`, muted zinc background, rounded), inline so it shares the row's truncation behaviour gracefully.
+    - The dot-status (success/failed/never-run) and token badge stay rendered at full opacity — they still describe the brief's last run, which is meaningful even for drafts.
+    - Sort order unchanged: alphabetical by name; drafts mix with published in the same list. (No separate «Drafts» section in this iteration.)
+
+PT6. `/schedule` MUST render drafts in a draft-styled row:
+    - Brief name in `opacity-60` plus a `Draft` chip in the «Brief» column (identical to the sidebar treatment).
+    - The «Proper enviament» column shows the next computed fire time but in muted style with a Tooltip on hover: «Aquest brief està despublicat — el cron no s'aplicarà fins que es publiqui». Reason: the cron expression is still valid, the user is intentionally not letting it run; surfacing what *would* fire helps the user decide if the schedule is still right.
+    - «Última run» and «Schedule» columns unchanged — same data either way.
+    - Sort order unchanged; drafts mix with published in the same table.
+
+PT7. The scheduler endpoint `/api/scheduler/tick` MUST filter drafts out of the candidate set **before** evaluating `isDue()`. Implementation: a single `.filter((b) => b.published !== false)` after `parseBrief` in the existing pipeline. The structured `console.log` payload (S6) MUST gain a new field `skipped_draft` reflecting the count of briefs filtered out so the operator can see the draft volume in Vercel Function Logs without parsing YAML. The JSON response payload (S5) MUST surface the same field for ad-hoc curl checks.
+
+PT8. **Run Now confirmation for drafts**: when the user clicks Run Now on a brief with `published: false` (either from the header button OR the sidebar kebab item), the platform MUST open a shadcn Dialog before dispatching:
+    - Title: «Brief despublicat».
+    - Body: «Aquest brief està en mode Draft — el cron no l'executa automàticament. Vols executar-lo manualment ara?».
+    - Buttons: «Cancel» (outline, secondary) + «Run anyway» (primary, dispatches via the same code path as the unconfirmed flow).
+    - The 2-minute cooldown (T2) applies AFTER the user confirms — the dialog itself is not gated by cooldown. A second Run Now within the cooldown window still gets the 429 toast.
+    - Published briefs (the common case) MUST NOT see the dialog: Run Now stays one-click. The dialog is the gentle nudge for the explicit «I know this is a draft, I want to run it anyway» state.
+
+PT9. **New brief default**: `/briefs/new` MUST initialise the form with `published: false`. The Switch is visible from the first render so the user can flip it on before Create if they want. Rationale: drafts-by-default lets users edit the prompt over multiple sessions without an accidental cron post landing in Slack before the brief is genuinely ready. The Create button label is unchanged («Create»); publish state is just one more field, not a separate action surface.
+
+PT10. **No separate publish/unpublish endpoints**: `POST /api/briefs` and `PUT /api/briefs/[name]` already accept the full brief payload — `published` flows through the existing zod schema + `serializeBrief` + GitHub commit pipeline like any other field. No `/api/briefs/[name]/publish` route is added. The commit message naturally surfaces the change (the existing «Update brief: <slug>» line is unchanged; users wanting an audit trail of publish toggles read it from `git log` on the YAML).
+
+PT11. `/history` is **not filtered** by publish state. A draft brief that was previously published has captured outputs; surfacing those at `/history` (and inside the per-brief drawer) stays useful — the publish toggle controls future scheduler behaviour, not historical visibility. Drafts that have never produced outputs naturally fall to the «Cap output capturat encara» bottom partition (see §4 req 59) without any extra logic.
+
+(Implementation tracked as **task 16.0** — currently deferred until prioritised. Decisions recorded with user 2026-05-17: 1.A priority before Mode data preview, 2.B drafts-by-default for new briefs, 3.C Run Now asks confirmation when draft, 4.A+B+D three surfaces — sidebar opacity+badge, /schedule draft-styled rows, detail page prominent toggle.)
+
+### Mode data preview (added 2026-05-17, task 17.0)
+
+Today the cycle for validating that a brief is wired to the right Mode query is painful: pick a `mode_report_token` + `queries[].token` in the form, save, hit Run Now, wait 30–90 s for the workflow + Mode run + Slack post, then realise in Slack that the query returned 0 rows / the wrong columns / stale data. Iterating means doing the loop again. This subsection adds a **server-fed preview** of the last successful Mode run for a selected query, rendered inline in the BriefForm so the user can validate query token + report token + column shape **before** ever saving the brief or dispatching a real run. The preview reuses Mode's most recent run on the parent report (no fresh SQL execution) so the latency is sub-3-seconds and the load on Mode is negligible.
+
+P1. The query row inside each source MUST surface a **«Preview data» button** immediately to the right of the `QueryCombobox`, using the lucide `Eye` icon plus the English label. The button is rendered both in edit and view modes — in view mode it offers a fast «see what this brief is wired to» without entering edit. The button is rendered for every query row, not once per source: each query gets its own preview because that's the unit the user is validating.
+
+P2. The button MUST be **disabled** when either `mode_report_token` for the parent source OR the query's `token` is empty (no point previewing nothing). Disabled state surfaces a tooltip in Catalan explaining «Selecciona report i query abans de fer preview». Once both fields are populated (whether picked from the catalog combobox or typed free-text), the button enables — the preview works against the raw tokens, not the catalog.
+
+P3. Clicking the button MUST open a **shadcn `Sheet` panel (side="right")**, matching the visual rhythm of the History drawer (task 12.0 / 15.0). The brief form stays mounted behind the Sheet; closing the Sheet (Escape, outside click, or X) returns the user to the form with no loss of scroll position or form state. Multiple Preview clicks in a row (different queries in different rows) MUST reuse the same Sheet — open one, close to dismiss, open another.
+
+P4. The Sheet header MUST surface, in this order:
+    - **Query name** (font-medium) when the token resolves to a name in the space catalog; the raw token (font-mono, muted) underneath. When the token is not in the catalog, the raw token is the primary line and there is no secondary line.
+    - **Run timestamp** in font-mono muted: «Last Mode run · fa 4h · HH:MM ds DD/MM» (Catalunya local). Tooltip on hover reveals the raw UTC ISO of the run completion. Helps the user spot a stale upstream pipeline at a glance.
+    - **Rows count** + **columns count**: «N rows · M columns». When N > 10 (the preview cap), the count surfaces the full N so the user knows the preview is a slice.
+    - **Refresh button** (lucide `RefreshCw`, ghost variant, size xs) on the right edge of the header that re-fetches with `?force=true`, bypassing the cache.
+
+P5. The Sheet body MUST render a **table** with one column per Mode query column and up to **10 rows** of data. Column headers come from the keys of the first row's JSON object (mirroring how the executor passes data to GROQ in `executor.py:build_user_message`). Cells render `null` as a muted «null» token, numbers right-aligned, strings left-aligned, nested objects / arrays as a `<code>`-styled compact JSON snippet (single line, truncated with ellipsis if >80 chars; full content available on hover via Tooltip). The table MUST scroll horizontally inside the Sheet body when the column count exceeds the panel width — no column truncation or hiding, just `overflow-x-auto` on the table wrapper.
+
+P6. **Edge cases the Sheet body MUST handle distinctly**:
+    - **No previous run on the report**: «Cap run previ d'aquest report a Mode. Desa el brief i fes Run Now per disparar el primer fetch.» No table, no error styling — informational state. Useful for newly-added queries that have never been executed.
+    - **Latest run failed (state ≠ succeeded)**: «L'últim run d'aquest report ha fallat (state: <state>). Tria un altre report o investiga a Mode.» With a discreet link to the Mode UI report page (`https://app.mode.com/<account>/reports/<token>/runs`).
+    - **Query token not found in the latest run**: «Aquesta query no apareix dins de l'últim run del report. Pot ser que s'hagi renombrat o esborrat a Mode.» Helps catch typos in the typed-free-text path.
+    - **Query returned 0 rows**: empty table + small «Cap fila retornada en aquest run» under it. Not an error — could be a legitimate state (filter too restrictive, off-day, …) the user wants to know about.
+    - **Mode API failure** (upstream 5xx, rate limit, auth): «Mode no disponible — torna a provar més tard» + Retry button that re-fires `?force=true`.
+
+P7. **Fetch strategy = reuse latest run** (decision recorded with user 2026-05-17): the preview MUST NOT trigger a fresh report run. Instead, it MUST list the report's existing runs via `GET /reports/{report_token}/runs`, pick the most recent **succeeded** one, list its query_runs, find the one matching the requested `query_token`, and fetch its `results/content.json`. Rationale: previews are about *structure validation* and *recency check*, not *fresh data*. A fresh run takes 30–120 s and consumes Mode execution capacity; reusing the latest succeeded run answers the user's question in 1–3 s at zero Mode cost.
+
+P8. New server endpoint `GET /api/mode/preview/[report]/[query]` MUST:
+    - Accept the `report` (Mode report token) and `query` (Mode query token) as path params.
+    - Accept `?limit=<n>` as an override (default 10, max 50 — anything higher is an anti-pattern for a UI preview).
+    - Accept `?force=true` to bypass cache.
+    - Return `{ kind: "ready", run: { completed_at, state }, query: { token, name }, columns: string[], rows: object[], total_rows: number }` on success.
+    - Return `{ kind: "no-previous-run" }` (HTTP 200) when the report has no succeeded runs.
+    - Return `{ kind: "run-failed", run: { state, …} }` (HTTP 200) when the latest run is in a failed state.
+    - Return `{ kind: "query-not-found" }` (HTTP 200) when the report has runs but the query token isn't present in the latest one.
+    - Return HTTP 502 with `{ error: <upstream-message> }` on Mode 5xx / network failure.
+
+P9. **Caching**: the endpoint MUST cache results in an in-memory `Map<string, …>` keyed by `<report>:<query>:<limit>` with a 5-minute TTL, matching `/api/channels`, `/api/runs/[brief]`, and `/api/briefs/[name]/outputs`. `?force=true` busts the entry. The cache is per-serverless-instance (no cross-instance coherence), same accepted trade-off as the other Mode endpoints.
+
+P10. The endpoint MUST never expose the Mode token / secret to the client — same `server-only` discipline as `web/lib/mode.ts`. All Mode HTTP calls happen server-side; the client only receives the sanitised payload.
+
+P11. The button MUST work uniformly for both **catalog-picked** and **typed-free-text** tokens. The preview validates against Mode directly — the catalog is just an autocomplete affordance. This means the Preview affordance is also the validation path for tokens that aren't in the configured space (e.g. a query the user wants to add from another Mode space, falling back to the executor's flexible token-handling).
+
+(Implementation tracked as **task 17.0** — currently deferred until prioritised. Decisions recorded with user 2026-05-17: 1.A reuse latest run, 2.A Sheet side="right", 3.A 10-row cap, 4.A 5-min TTL + ?force=true.)
+
 ## 5. Non-Goals (Out of Scope)
 
 - ~~**Authentication and per-user briefs**. The platform is openly accessible; everyone sees and edits everything. The data model includes a nullable `owner_email` field reserved for a future auth phase but it is never populated in this version.~~ **SUPERSEDED 2026-05-16 by §4 «Authentication & Access Control»**: authentication is now required (magic-link, domain-restricted to `@cooltra.com` / `@felyx.com`), and `owner_email` is now populated on every brief. **Per-user data isolation remains out of scope**: every authenticated user still sees and edits every brief; `owner_email` is captured but does not gate any action.
@@ -372,6 +461,45 @@ M5. **Run Now** from the kebab MUST share the same 2-minute cooldown state as th
 - **Why Popover instead of shadcn DropdownMenu**: the project hasn't installed `dropdown-menu` (per `web/components/ui/` inventory). Popover + manually-styled menu items keeps the diff contained to the feature instead of adding a new shadcn primitive whose only consumer is this menu. If a second kebab consumer appears (e.g. a `/schedule` row menu), the right refactor would be to install `dropdown-menu` and migrate both call-sites; a yagni for the current single consumer.
 - **Why don't strip the query params after activation**: refreshing a `/briefs/<slug>?edit=1` page re-lands in edit mode, which matches user intent (the user explicitly entered edit mode and a refresh shouldn't kick them back to view). Same logic for `?history=1`. The cost is URL clutter — acceptable since the action vectors are internal (kebab clicks) rather than shareable links.
 
+### Publish / Unpublish brief
+
+- **Schema** (`web/lib/schemas.ts`): `briefSchema` grows a `published: z.boolean()` field. **No `.default(true)` on the zod schema** because RHF input/output types diverge when a `default` is set and the existing form code reads `published` directly. Instead, `parseBrief` (`web/lib/yaml.ts`) normalises a missing or non-boolean YAML value to `true` so legacy briefs round-trip cleanly even before the PT2 migration commit. `serializeBrief` emits the field explicitly in every YAML it writes; the canonical key order in `EMITTED_KEYS` gains `published` immediately after `name` so the field is the first thing the human reader sees.
+- **Migration commit** (PT2): a single commit on the same PR that ships task 16.0, touching every `briefs/*.yml` to add `published: true`. Executed via a one-shot script (`scripts/add_published_field.py`, then deleted in the same PR — the file is single-use migration code, not operational). Verification: `git diff` on the migration commit shows N lines added (`published: true`), zero lines removed.
+- **Scheduler change** (`web/app/api/scheduler/tick/route.ts`): one-line filter added after `parseBrief` and before the `isDue()` loop:
+  ```ts
+  const candidates = briefs.filter((b) => b.published !== false);
+  ```
+  Default-true semantics live in `parseBrief`, so the predicate here is `!== false` not `=== true` — defensive against any edge case where a brief somehow lands without the field after the migration. `skipped_draft = briefs.length - candidates.length` flows into both the JSON response and the structured `console.log` payload.
+- **Form changes** (`web/components/BriefForm.tsx`):
+  - New shadcn primitive: `npx shadcn@latest add switch`. The Switch is the only new shadcn install in this task.
+  - The form's title-row toolbar (currently `[Run Now] [History]` in view mode, `[Save] [Cancel]` in edit) gains a `<PublishedToggle>` to the left of Run Now. View mode: read-only Switch + a small inline status label. Edit mode: interactive Switch bound via `Controller` to `published`. The Switch's `onCheckedChange` updates RHF state; Save commits.
+  - Page header badge: new `<PublishedBadge published={...}>` mounted next to the brief name (in `app/briefs/[name]/page.tsx`'s title rendering). Server-rendered from the parsed brief so the badge is visible immediately on landing, no client hydration flash. The detail page receives `published` for free since it's already parsing the brief.
+- **Sidebar changes** (`web/components/BriefSidebarList.tsx`):
+  - The row builder receives `published` per item (added to `getBriefListWithRuns`'s shape with no perf cost — the YAML is already parsed for the rest of the row data).
+  - Conditional class: `cn("group ...", !published && "opacity-60")`. Existing `tooltip-on-truncated-name` behaviour preserved.
+  - A small `<DraftChip>` (font-mono `text-[10px]`, zinc background, rounded) rendered inline after the brief name when `!published`. Truncation behaviour: the chip is `shrink-0` and the name span retains `truncate`, so the chip never gets clipped; long names truncate as before.
+- **`/schedule` changes** (`web/app/schedule/page.tsx` / `ScheduleTable`): same `published`-aware row styling. The `Proper enviament` cell gains a conditional Tooltip wrapper when `!published`, body «Aquest brief està despublicat — el cron no s'aplicarà fins que es publiqui». No sort changes.
+- **Run Now dialog**: the existing `RunNowButton` (`web/components/RunNowButton.tsx`) and the kebab menu item (`web/components/BriefRowMenu.tsx`) currently call `dispatch()` directly. Both paths gain a check: if `brief.published === false`, open a shadcn `Dialog` first. The dialog body is a thin component (`<DraftRunConfirmDialog>`) reused by both call-sites. Confirming the dialog calls the same `dispatch()` — same code path, same cooldown semantics, same toast. The dialog is **not** centralised in a hook because each call-site already manages its own popover/menu state; adding a shared hook would double the surface area for a single shared dialog.
+- **API endpoints**: no new endpoint. `POST /api/briefs` and `PUT /api/briefs/[name]` already serialise the full payload; the schema change above is enough. The `getBriefListWithRuns` helper (used by sidebar + `/schedule`) needs `published` propagated through the row shape — one-line addition.
+- **No client-side bust of the scheduler cache**: the scheduler endpoint reads briefs fresh on every tick (`no-store` via `lib/github.ts:ghFetch`), so toggling publish on a brief takes effect on the very next tick (≤ 5 min). No additional invalidation needed.
+- **Why drafts-by-default for new briefs**: confirmed with user 2026-05-17. Removes the risk of an accidental Slack post landing while the prompt is still half-written. The cost — one extra click on the Switch when the user is ready to ship — is trivial compared to the cost of accidentally publishing a malformed brief into a live channel. (Existing briefs migrate to `published: true` precisely to preserve the live behaviour they already had; only NEW briefs are affected by the default.)
+
+### Mode data preview
+
+- **New `web/lib/mode.ts` helpers** (in the same file that already hosts `listSpaceReports` + `listReportQueries`, sharing `getConfig()` + `authHeader()`):
+  - `listReportRuns(reportToken)` — `GET /reports/{token}/runs`. Returns the embedded `runs[]` array sorted descending by `completed_at`. Mode's API already returns recent-first, but we sort defensively because the field is documented as "approximately ordered".
+  - `findLatestSucceededRun(reportToken)` — wraps the above, returns the first run whose `state === "succeeded"` or `null` when none exists. The endpoint distinguishes `null` (→ `kind: "no-previous-run"`) from "runs exist but newest is failed" (→ `kind: "run-failed"`, surfacing the latest run's state) by also peeking at `runs[0]` when the filter is empty.
+  - `listQueryRunsForRun(reportToken, runToken)` — `GET /reports/{token}/runs/{runToken}/query_runs`. Returns the `query_runs[]` array (each with `token`, `query_name`, `state`).
+  - `getQueryRunResults(reportToken, runToken, queryRunToken)` — `GET /reports/{token}/runs/{runToken}/query_runs/{queryRunToken}/results/content.json`. Returns an array of row objects matching exactly what the Python `executor.py:get_query_results` returns. Mode caps the JSON response at ~1k rows; if a query happens to be larger, we slice to `limit` after fetch (the API doesn't expose a server-side limit param).
+- **New endpoint** `web/app/api/mode/preview/[report]/[query]/route.ts`: runtime `nodejs`, `export const dynamic = "force-dynamic"`. Orchestrates the four helpers above. The discriminated-union response (`kind: "ready" | "no-previous-run" | "run-failed" | "query-not-found"`) is HTTP 200 in every "expected" state; only Mode 5xx / auth / network errors return 502. Rationale: every non-`ready` state is informational and the client renders it with a specific message — wrapping them in 4xx would force the client into an error-handling code path for normal user states.
+- **Shared cache pattern**: a module-level `Map<string, { fetchedAt: number; data: PreviewResult }>` with `TTL_MS = 5 * 60 * 1000`. Cache key is `<reportToken>:<queryToken>:<limit>` so two simultaneous previews on different queries don't collide. `?force=true` deletes the entry before re-fetching. Identical structure to `lib/channels.ts` and the cache inside `/api/runs/[brief]`.
+- **`PreviewSheet` client component** (new, `web/components/PreviewSheet.tsx`): a shadcn `Sheet` (side="right") that the BriefForm controls via a `preview` state slice `{ open, reportToken, queryToken } | null`. The Sheet is mounted once at the BriefForm root; opening / closing / switching queries flows through that single state, so we never paint two Sheets at once. Inside, a `useEffect` keyed on `[reportToken, queryToken]` fires the `/api/mode/preview/...` fetch on every change; the in-flight request is aborted via `AbortController` when the user re-opens for a different query.
+- **`PreviewTable` sub-component**: a thin presentational `<table>` with `min-w-full` + `overflow-x-auto` on the wrapper, JetBrains Mono for cell content. The cell renderer is a `function renderCell(value: unknown): ReactNode` that handles `null` / `number` / `string` / `boolean` / nested object distinctly, and clamps long content with `truncate` + Tooltip showing the raw value. Pure function — easy to unit-test if we ever add a test layer.
+- **`PreviewButton` (new) lives inside `BriefForm`'s query row** between `<QueryCombobox>` and the trash icon. Uses lucide `Eye` + the "Preview data" English label, ghost variant, size sm. Disabled state is computed from `watch("sources.<i>.mode_report_token")` + `watch("sources.<i>.queries.<j>.token")` via RHF; an `aria-disabled` + Tooltip carry the help copy. Click handler calls a `setPreview({ open: true, reportToken, queryToken })` provided by the form's preview state hook.
+- **Why we don't trigger a fresh run from the preview**: confirmed with user 2026-05-17. (1) latency: a fresh run is 30–120 s, the user would abandon the panel before it loaded; (2) Mode cost: each run consumes execution capacity on the Mode account, and an iterating user could trivially fire 20–50 previews per session; (3) the *thing the user is validating* is the wiring (right report, right query, recognisable columns) — fresh data is irrelevant to that question. The Run Now button (task 6.0) remains the path to "I want fresh data delivered to Slack".
+- **Mode API rate limits**: undocumented but observed to be generous (~hundreds of req/min). Our 5-min cache + the natural cadence of user interaction (open Sheet → read 10 rows → close → maybe re-open in 30 s) keeps us comfortably below any plausible ceiling. If rate-limit 429s start surfacing in production we'll add a small `Retry-After`-aware backoff layer.
+- **Why no `force-dynamic` cache invalidation across mutations**: previews are read-only with respect to the brief lifecycle — they don't depend on `briefs/*.yml` state. The 5-min TTL is the only invalidation knob the user needs; the in-form Refresh button delivers it.
+
 ### Execution tracking
 - Modify `scripts/executor.py` to write a JSON file `out/<brief-slug>.run.json` per execution, containing:
   ```json
@@ -456,6 +584,8 @@ M5. **Run Now** from the kebab MUST share the same 2-minute cooldown state as th
 - **Reliability**: at least 99% of writes succeed (commit lands on `main` and is reflected in the UI) when measured over a rolling 30-day window.
 - **Support load**: zero "how do I…" questions arrive to the engineering team that are answered by information already visible in the inline help texts.
 - **Channel-misconfiguration runtime failures**: at most 1 per month after launch. Users either pick a valid channel from the dropdown or follow the inline `/invite` snippet — they should not be discovering "bot not in channel" through a Slack delivery error.
+- **Query-misconfiguration discovered before save** (added with task 17.0): once Mode data preview ships, the expectation is that the «query returns 0 rows / wrong columns / wrong report» mistakes get caught in the form, not after a Run Now. Concretely: at most 1 brief per month is created or edited and then dispatched via Run Now while its primary query returns 0 rows or fails with a missing-token error — measured by inspecting `.run.json` failures for «query not found» / «0 rows» patterns over a rolling 30-day window.
+- **Accidental Slack posts from in-progress briefs** (added with task 16.0): once Publish/Unpublish ships and new briefs default to Draft, the rate of «we posted to Slack while still iterating the prompt» events should drop to zero. Measured by inspecting `.run.json` records for briefs whose YAML was edited within ~15 min of the dispatch (a proxy for «still actively iterating»); the count of such events over a rolling 30-day window should land at 0 — every iteration cycle now happens before publish.
 
 ## 9. Open Questions
 
@@ -467,3 +597,5 @@ M5. **Run Now** from the kebab MUST share the same 2-minute cooldown state as th
 6. **Visualisation of token consumption over time**: nice-to-have for a future iteration. Not in this PRD's scope, but the artifact data captured here enables it.
 7. **DM-style destinations**: the `slack_channel` field accepts a channel name. Should we also support direct messages (`@username`) or multi-person DMs as destinations? Out of scope today, but the schema (single string) doesn't preclude it. Decide before implementation if such use cases exist.
 8. **Migrating "fully-private" channels**: if Cooltra later wants briefs to publish to channels where the bot's `groups:read` is disabled by workspace policy, what's the fallback? Most likely: those channels don't appear in the dropdown and the user must type them manually + trigger the warning flow. Validate this assumption with workspace admin.
+9. **Mode preview row cap escape hatch** (added with task 17.0): the 10-row cap is enough for structure validation, but if a power user ever asks «can I see more rows here?», do we add the `limit` query string surface to the UI (e.g. a small «Show 25» toggle in the Sheet footer) or push them to Mode directly via the «Open in Mode» link from the run-failed state? Lean toward the latter — keeping the preview deliberately compact prevents it from becoming a Mode alternative. Re-evaluate after the feature has been in production for ~30 days.
+10. **Bulk publish/unpublish** (added with task 16.0): once Draft becomes a real state, will operators want to publish or unpublish multiple briefs at once (e.g. before a holiday — «pause every daily brief until next Monday»)? V1 has no bulk affordance — toggling 10 briefs takes 10 clicks. If pain emerges, candidate surfaces are a sidebar «Select multiple» mode or a `/schedule` checkbox column. Deferred until usage data justifies it.
