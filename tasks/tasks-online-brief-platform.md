@@ -684,9 +684,9 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     - **No PRD edits at this stage** — the PRD already reflects the shipped spec (P1-P11 + §7) via the commits landed during the create-prd round. If implementation surfaces a deviation, document it inline at the deviating sub-task and add a «deviation» ribbon-note to the PRD section per the project convention.
 - [ ] **18.0 Dry-run output** — PRD §4 «Dry-run output» + §7 «Dry-run output». Branch `feature/18.0-dry-run-output` (already created, branched from the PRD-only base so it does not carry task 16.0 / 17.0 code). The Mode helpers this task needs that are ALSO part of 17.0 (`listQueryRunsForRun`, `getQueryRunResults`, `ModeQueryRun` type) are implemented locally here too — keeping the branches independent. When both PRs land on main, the second-to-merge resolves the helper duplication trivially (the two implementations are intentionally identical). **Operator action**: copy `GROQ_API_KEY` from the GitHub Secrets into the Vercel env-var inventory (Production + Preview, encrypted) before the PR can be smoke-tested.
 
-  - [ ] 18.1 Install the GROQ JS SDK: `cd web && npm install groq-sdk`. Adds it to `package.json` dependencies. The SDK mirrors the OpenAI SDK API (`chat.completions.create` with `stream: true` returning an async iterator), already battle-tested by the Python `executor.py` against `llama-3.3-70b-versatile`.
+  - [x] 18.1 Install the GROQ JS SDK: `cd web && npm install groq-sdk`. Adds it to `package.json` dependencies. The SDK mirrors the OpenAI SDK API (`chat.completions.create` with `stream: true` returning an async iterator), already battle-tested by the Python `executor.py` against `llama-3.3-70b-versatile`.
 
-  - [ ] 18.2 Extend `web/lib/mode.ts` with the helpers the dry-run pipeline needs that are NOT already in this branch (task 18.0 branched before 17.0 landed). Specifically:
+  - [x] 18.2 Extend `web/lib/mode.ts` with the helpers the dry-run pipeline needs that are NOT already in this branch (task 18.0 branched before 17.0 landed). Specifically:
     - `triggerReport(reportToken)` — `POST /api/${account}/reports/${reportToken}/runs`. Mirrors `executor.py:trigger_report`. Returns the new run's token (`{token}` from the response body).
     - `waitForCompletion(reportToken, runToken, opts?)` — polls `GET /api/${account}/reports/${reportToken}/runs/${runToken}` every 2 s until `state` is in `["completed", "succeeded"]` (success) or a failure terminal state. Throws on failure or timeout (`opts.deadlineMs`, default 120 s — Mode runs typically finish in 5-15 s; 120 s is the safe-but-not-runaway ceiling).
     - `listQueryRunsForRun(reportToken, runToken)` — `GET /api/${account}/reports/${reportToken}/runs/${runToken}/query_runs`. Returns `_embedded.query_runs[]` with `{ token, query_token?, query_name, state }`.
@@ -694,12 +694,12 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     - `getReportMetadata(reportToken)` — `GET /api/${account}/reports/${reportToken}`. Returns `{ name }`. Used to build the «Today's date: …\n\n## Query: "..." (from report "...")» header line in `dryRun.ts:buildUserMessage`.
     All follow the existing `getConfig()` + `authHeader()` + `throw new Error(...)` patterns of the file. Add a new exported type `ModeQueryRun` to `lib/mode-types.ts` matching what 17.0's identical type defines.
 
-  - [ ] 18.3 Implement `web/lib/groq.ts` — wrapper over the GROQ SDK with streaming support.
+  - [x] 18.3 Implement `web/lib/groq.ts` — wrapper over the GROQ SDK with streaming support.
     - Constants: `LLM_MODEL = "llama-3.3-70b-versatile"` (matches `executor.py:LLM_MODEL`), `LLM_TEMPERATURE = 0.7`, `LLM_MAX_TOKENS = 4096`. All exported so the dry-run orchestrator can reference them.
     - `getGroqClient()`: lazy-construct + return a `Groq` instance from the `groq-sdk` package, reading `GROQ_API_KEY` from `process.env`. Throws a clear error when the env var is missing.
     - `streamChatCompletion({ systemPrompt, userMessage, signal })`: async generator that yields `{ delta: string }` for each token chunk and finally `{ done: true, usage: { input, output, total } }`. Internally calls `groq.chat.completions.create({ model, messages, stream: true, temperature, max_tokens }, { signal })`. The SDK's stream is an async iterable of chunks shaped like the OpenAI streaming response; project each chunk's `choices[0].delta.content` to a delta, and read the final chunk's `x_groq?.usage` for token counts.
 
-  - [ ] 18.4 Implement `web/lib/dryRun.ts` — the orchestrator that walks Mode then GROQ.
+  - [x] 18.4 Implement `web/lib/dryRun.ts` — the orchestrator that walks Mode then GROQ.
     - Exports `async function* runDryRun(brief: Brief, signal: AbortSignal): AsyncGenerator<DryRunEvent>` where `DryRunEvent` is:
       ```ts
       type DryRunEvent =
@@ -716,7 +716,7 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
       5. Yield the final `complete` event with the usage payload.
     - Catch errors at each phase boundary; yield `error` event with the phase tag. The route handler converts these into SSE `error` events.
 
-  - [ ] 18.5 Implement `web/app/api/briefs/dry-run/route.ts` — the POST endpoint with SSE response.
+  - [x] 18.5 Implement `web/app/api/briefs/dry-run/route.ts` — the POST endpoint with SSE response.
     - File header: `import "server-only";`, `export const runtime = "nodejs";`, `export const dynamic = "force-dynamic";`.
     - `POST` handler: validate `await request.json()` against `briefSchema`; respond 400 with zod errors on validation failure.
     - Build a `ReadableStream` that consumes `runDryRun(brief, request.signal)` and emits SSE-formatted lines (`event: <kind>\ndata: <json>\n\n`) for each event.

@@ -18,6 +18,19 @@ export type {
 
 const MODE_BASE_URL = "https://app.mode.com/api";
 
+// Poll cadence + ceiling for `waitForCompletion`. Mode runs typically
+// finish in 5-15 s; 120 s is the safe-but-not-runaway ceiling
+// (matches `scripts/executor.py:POLL_TIMEOUT_SECONDS`).
+const POLL_INTERVAL_MS = 2000;
+const DEFAULT_POLL_DEADLINE_MS = 120_000;
+const SUCCESS_STATES = new Set(["completed", "succeeded"]);
+const IN_PROGRESS_STATES = new Set([
+  "enqueued",
+  "pending",
+  "running",
+  "cancelling",
+]);
+
 function getConfig() {
   const token = process.env.MODE_TOKEN;
   const secret = process.env.MODE_SECRET;
@@ -99,6 +112,124 @@ export async function listReportQueries(
 }
 
 /**
+ * Fetch a Mode report's metadata. The dry-run pipeline (task 18.0)
+ * uses the human-readable `name` to inject into the user_message
+ * block as `## Query: "..." (from report "<title>")`.
+ */
+export async function getReportMetadata(
+  reportToken: string
+): Promise<{ name: string }> {
+  const { token, secret, account } = getConfig();
+  const res = await fetch(
+    `${MODE_BASE_URL}/${account}/reports/${reportToken}`,
+    {
+      headers: {
+        Accept: "application/hal+json",
+        Authorization: authHeader(token, secret),
+      },
+      cache: "no-store",
+    }
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Mode getReportMetadata(${reportToken}) failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const data = (await res.json()) as { name?: string };
+  return { name: data.name ?? reportToken };
+}
+
+/**
+ * Trigger a fresh run of a Mode report. Mirrors
+ * `executor.py:trigger_report`. Returns the new run's token; the
+ * caller polls it via `waitForCompletion` until success / failure /
+ * timeout.
+ *
+ * Used by the dry-run endpoint (task 18.0) to fetch fresh data —
+ * deliberately different from the preview path (task 17.0) which
+ * reuses the latest succeeded run instead of triggering.
+ */
+export async function triggerReport(reportToken: string): Promise<string> {
+  const { token, secret, account } = getConfig();
+  const res = await fetch(
+    `${MODE_BASE_URL}/${account}/reports/${reportToken}/runs`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/hal+json",
+        Authorization: authHeader(token, secret),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+      cache: "no-store",
+    }
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Mode triggerReport(${reportToken}) failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const data = (await res.json()) as { token?: string };
+  if (!data.token) {
+    throw new Error(
+      `Mode triggerReport(${reportToken}) returned no run token`
+    );
+  }
+  return data.token;
+}
+
+/**
+ * Poll a Mode run until it reaches a terminal state. Throws on
+ * failure / timeout / abort. Mirrors `executor.py:wait_for_completion`
+ * with the additional `signal` integration so the dry-run cancel
+ * path tears down cleanly.
+ */
+export async function waitForCompletion(
+  reportToken: string,
+  runToken: string,
+  opts: { signal?: AbortSignal; deadlineMs?: number } = {}
+): Promise<void> {
+  const { token, secret, account } = getConfig();
+  const deadline = Date.now() + (opts.deadlineMs ?? DEFAULT_POLL_DEADLINE_MS);
+
+  while (true) {
+    if (opts.signal?.aborted) {
+      throw new Error("Mode waitForCompletion aborted by caller");
+    }
+    const res = await fetch(
+      `${MODE_BASE_URL}/${account}/reports/${reportToken}/runs/${runToken}`,
+      {
+        headers: {
+          Accept: "application/hal+json",
+          Authorization: authHeader(token, secret),
+        },
+        cache: "no-store",
+        signal: opts.signal,
+      }
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Mode waitForCompletion(${reportToken}, ${runToken}) failed: ${res.status} ${await res.text()}`
+      );
+    }
+    const data = (await res.json()) as { state?: string };
+    const state = data.state ?? "unknown";
+    if (SUCCESS_STATES.has(state)) return;
+    if (!IN_PROGRESS_STATES.has(state)) {
+      throw new Error(
+        `Mode waitForCompletion(${reportToken}, ${runToken}) terminal non-success state: ${state}`
+      );
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Mode waitForCompletion(${reportToken}, ${runToken}) timed out after ${opts.deadlineMs ?? DEFAULT_POLL_DEADLINE_MS}ms`
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+}
+
+/**
  * List the historical runs of a Mode report, sorted descending by
  * completion time. Returns the raw `_embedded.runs[]` projected to the
  * fields the preview endpoint (task 17.0) consumes: token, state,
@@ -174,6 +305,11 @@ export async function findLatestSucceededRun(
 /**
  * List the query runs that ran as part of a specific report run.
  * Mirrors the Python executor's `list_query_runs(...)` flow.
+ *
+ * Returns BOTH `token` (per-run query_run identifier; plugs into the
+ * results URL) and `query_token` (stable query identifier; matches
+ * the token the BriefForm carries). Older Mode tenants may omit
+ * `query_token`; the caller falls back to matching by `query_name`.
  */
 export async function listQueryRunsForRun(
   reportToken: string,
@@ -218,9 +354,8 @@ export async function listQueryRunsForRun(
  * Fetch the row payload of a specific query run. Mirrors the Python
  * executor's `get_query_results(...)` flow — same JSON `content.json`
  * resource. Returns an array of row objects; Mode caps the response
- * at ~1000 rows. The caller (preview endpoint) slices to the
- * user-requested `limit` after the fetch — Mode does not expose a
- * server-side limit param.
+ * at ~1000 rows. Consumers slice to whatever cap they need after the
+ * fetch — Mode does not expose a server-side limit param.
  */
 export async function getQueryRunResults(
   reportToken: string,
