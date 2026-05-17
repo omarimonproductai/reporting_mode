@@ -203,10 +203,6 @@ export function ExecutionMetadata({ filename }: { filename: string }) {
           {record.error}
         </div>
       )}
-
-      <div className="mt-1 truncate pl-6 text-[10px] font-mono text-zinc-400">
-        from {state.artifact_name}
-      </div>
     </Card>
   );
 }
