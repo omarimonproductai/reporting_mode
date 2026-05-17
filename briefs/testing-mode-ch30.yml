@@ -1,5 +1,5 @@
 name: Testing mode CH30
-published: false
+published: true
 schedule: 0 8 * * *
 slack_channel: test-github-oriol
 sources:
