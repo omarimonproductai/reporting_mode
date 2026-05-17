@@ -66,6 +66,7 @@ type Props = EditProps | CreateProps;
 
 const EMPTY_BRIEF: Brief = {
   name: "",
+  published: false,
   schedule: "0 8 * * *",
   slack_channel: "",
   reference_link: "",
