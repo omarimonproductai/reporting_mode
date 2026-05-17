@@ -5,11 +5,20 @@ import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraftRunConfirmDialog } from "@/components/DraftRunConfirmDialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { formatMmSs, useRunNow } from "@/hooks/useRunNow";
+import { isDryRunFresh } from "@/lib/dryRunTracking";
 
 type Props =
   | { mode: "create" }
@@ -25,9 +34,6 @@ type Props =
 
 export function RunNowButton(props: Props) {
   if (props.mode === "create") {
-    // Disabled-with-hint on /briefs/new. Wrapping the disabled button
-    // in a span keeps the Tooltip listener alive — Radix tooltips don't
-    // receive hover events on a child whose pointer-events: none.
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -64,7 +70,8 @@ function RunNowButtonExisting({
 }) {
   const { running, onCooldown, remainingSeconds, dispatch } =
     useRunNow(filename);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
+  const [previewWarnOpen, setPreviewWarnOpen] = useState(false);
   const disabled = running || onCooldown;
   const label = running
     ? "Running…"
@@ -72,17 +79,40 @@ function RunNowButtonExisting({
       ? `Run Now — torna a provar en ${formatMmSs(remainingSeconds)}`
       : "Run Now";
 
+  // Stacked confirmations:
+  // 1. Draft? → DraftRunConfirmDialog (warns about publishing an
+  //    in-progress brief).
+  // 2. Otherwise no recent dry-run? → preview-warn Dialog (warns
+  //    about dispatching without having validated the output first,
+  //    task 18.0).
+  // 3. Otherwise → dispatch directly.
   function onClick() {
+    if (disabled) return;
     if (!published) {
-      setConfirmOpen(true);
+      setDraftConfirmOpen(true);
       return;
     }
-    dispatch();
+    if (!isDryRunFresh(filename)) {
+      setPreviewWarnOpen(true);
+      return;
+    }
+    void dispatch();
   }
 
-  function onConfirm() {
-    setConfirmOpen(false);
-    dispatch();
+  function onDraftConfirm() {
+    setDraftConfirmOpen(false);
+    // After confirming the draft warning, ALSO surface the preview
+    // warning if applicable — the two gates compose.
+    if (!isDryRunFresh(filename)) {
+      setPreviewWarnOpen(true);
+      return;
+    }
+    void dispatch();
+  }
+
+  function onPreviewConfirm() {
+    setPreviewWarnOpen(false);
+    void dispatch();
   }
 
   return (
@@ -92,11 +122,35 @@ function RunNowButtonExisting({
         {label}
       </Button>
       <DraftRunConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        onConfirm={onConfirm}
+        open={draftConfirmOpen}
+        onOpenChange={setDraftConfirmOpen}
+        onConfirm={onDraftConfirm}
         briefName={briefName}
       />
+      <Dialog open={previewWarnOpen} onOpenChange={setPreviewWarnOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disparar Run Now sense Preview recent?</DialogTitle>
+            <DialogDescription>
+              No has fet un Preview en els últims 10 minuts. Run Now
+              publicarà el missatge al canal de Slack i no es pot
+              desfer. Vols continuar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPreviewWarnOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={onPreviewConfirm}>
+              Continua i dispara
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

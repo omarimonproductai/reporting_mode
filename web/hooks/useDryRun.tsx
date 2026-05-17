@@ -4,22 +4,32 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { DryRunSheet } from "@/components/DryRunSheet";
 import type { Brief } from "@/lib/schemas";
 
+type RunOpts = { filename?: string };
+
 type Ctx = {
-  run: (brief: Brief) => void;
+  run: (brief: Brief, opts?: RunOpts) => void;
 };
 
 const DryRunContext = createContext<Ctx | null>(null);
 
 export function DryRunProvider({ children }: { children: ReactNode }) {
-  const [payload, setPayload] = useState<Brief | null>(null);
+  const [state, setState] = useState<
+    { payload: Brief; filename: string | null } | null
+  >(null);
 
   return (
-    <DryRunContext.Provider value={{ run: (brief) => setPayload(brief) }}>
+    <DryRunContext.Provider
+      value={{
+        run: (brief, opts) =>
+          setState({ payload: brief, filename: opts?.filename ?? null }),
+      }}
+    >
       {children}
       <DryRunSheet
-        open={payload !== null}
-        payload={payload}
-        onClose={() => setPayload(null)}
+        open={state !== null}
+        payload={state?.payload ?? null}
+        filename={state?.filename ?? null}
+        onClose={() => setState(null)}
       />
     </DryRunContext.Provider>
   );

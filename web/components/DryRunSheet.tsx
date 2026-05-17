@@ -19,10 +19,17 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { Brief } from "@/lib/schemas";
+import { setLastDryRun } from "@/lib/dryRunTracking";
 
 type Props = {
   open: boolean;
   payload: Brief | null;
+  // Filename of the persisted brief this dry-run is for. Null on
+  // create-flow dry-runs (the brief has no filename yet). When
+  // present and the dry-run reaches `ready`, the Sheet records a
+  // localStorage timestamp via setLastDryRun(filename) so the
+  // RunNowButton can skip its «no preview recent» confirmation.
+  filename: string | null;
   onClose: () => void;
 };
 
@@ -45,7 +52,7 @@ type State =
       message: string;
     };
 
-export function DryRunSheet({ open, payload, onClose }: Props) {
+export function DryRunSheet({ open, payload, filename, onClose }: Props) {
   const [state, setState] = useState<State>({ kind: "idle" });
 
   useEffect(() => {
@@ -137,6 +144,7 @@ export function DryRunSheet({ open, payload, onClose }: Props) {
                 markdown: accumulated,
                 usage: event.usage,
               });
+              if (filename) setLastDryRun(filename);
             } else if (event.kind === "error" && event.message) {
               setState({
                 kind: "error",
@@ -182,8 +190,8 @@ export function DryRunSheet({ open, payload, onClose }: Props) {
         if (!next) onClose();
       }}
     >
-      <SheetContent side="right" className="w-full sm:max-w-2xl">
-        <SheetHeader>
+      <SheetContent side="right" className="flex w-full flex-col sm:max-w-2xl">
+        <SheetHeader className="shrink-0 pr-12">
           <SheetTitle className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-2 text-base font-medium">
               <Sparkles className="size-4 text-zinc-500" />
@@ -206,7 +214,7 @@ export function DryRunSheet({ open, payload, onClose }: Props) {
             <PhaseIndicator state={state} />
           </SheetDescription>
         </SheetHeader>
-        <div className="px-4 pb-6">
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
           <DryRunBody state={state} />
         </div>
       </SheetContent>
@@ -267,7 +275,11 @@ function DryRunBody({ state }: { state: State }) {
         <Alert variant="destructive">
           <AlertTriangle />
           <AlertTitle>{state.phase === "mode" ? "Mode" : "GROQ"} ha fallat</AlertTitle>
-          <AlertDescription>{state.message}</AlertDescription>
+          <AlertDescription>
+            <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-red-50/50 p-2 font-mono text-[11px] leading-snug text-red-900">
+              {state.message}
+            </pre>
+          </AlertDescription>
         </Alert>
         {state.markdown && (
           <div className="rounded border border-zinc-200 p-3">

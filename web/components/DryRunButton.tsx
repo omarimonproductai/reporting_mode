@@ -11,8 +11,23 @@ import { useDryRun } from "@/hooks/useDryRun";
 import { briefSchema, type Brief } from "@/lib/schemas";
 
 type Props =
-  | { mode: "persisted"; brief: Brief; size?: "sm" | "default" }
-  | { mode: "form"; getBrief: () => Brief; size?: "sm" | "default" };
+  | {
+      mode: "persisted";
+      brief: Brief;
+      filename?: string;
+      size?: "sm" | "default";
+    }
+  | {
+      mode: "form";
+      getBrief: () => Brief;
+      // Form validity as known by RHF. When false the button stays
+      // visible but disabled with a Tooltip — meets the smoke-test
+      // feedback «Preview shouldn't appear by magic»; it's always
+      // there, just inert until prerequisites are met.
+      disabled?: boolean;
+      filename?: string;
+      size?: "sm" | "default";
+    };
 
 export function DryRunButton(props: Props) {
   const { run } = useDryRun();
@@ -26,31 +41,34 @@ export function DryRunButton(props: Props) {
       // defensive — never dispatch an invalid payload.
       return;
     }
-    run(parsed.data);
+    run(parsed.data, { filename: props.filename });
   }
 
-  // For the "persisted" mode we can validate at render time. For
-  // "form" we don't know the latest values until click, so the
-  // disabled gating only applies to the persisted path.
-  if (props.mode === "persisted") {
-    const valid = briefSchema.safeParse(props.brief).success;
-    if (!valid) {
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span tabIndex={0} className="inline-flex">
-              <Button type="button" variant="outline" size={size} disabled>
-                <Sparkles />
-                Preview output
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            Omple els camps obligatoris abans de fer preview.
-          </TooltipContent>
-        </Tooltip>
-      );
-    }
+  // Disabled state: in "persisted" mode we know up-front via
+  // safeParse; in "form" mode we trust the caller's `disabled` prop
+  // (typically RHF's !isValid). Either way the button stays mounted
+  // — no «appears by magic» surprise.
+  const formDisabled = props.mode === "form" && props.disabled === true;
+  const persistedDisabled =
+    props.mode === "persisted" && !briefSchema.safeParse(props.brief).success;
+  const isDisabled = formDisabled || persistedDisabled;
+
+  if (isDisabled) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0} className="inline-flex">
+            <Button type="button" variant="outline" size={size} disabled>
+              <Sparkles />
+              Preview output
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          Omple els camps obligatoris abans de fer preview.
+        </TooltipContent>
+      </Tooltip>
+    );
   }
 
   return (
