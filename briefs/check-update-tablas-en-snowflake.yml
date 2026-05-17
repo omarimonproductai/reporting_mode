@@ -1,6 +1,6 @@
 name: Check update tablas en snowflake
 published: true
-schedule: 0 * * * *
+schedule: 0 10 * * *
 slack_channel: test-github-oriol
 sources:
   - mode_report_token: a4b936e1b15b
