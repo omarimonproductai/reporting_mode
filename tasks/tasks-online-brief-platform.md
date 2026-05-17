@@ -517,7 +517,7 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     - Mounted in `web/app/briefs/[name]/page.tsx`'s title rendering (next to the brief name, before the loaded-at indicator). Server-rendered from the parsed brief so the badge is visible immediately on landing — no client hydration flash. The page already parses the brief; just thread the `published` field through to the title block.
     - **NOT mounted on `/briefs/new`** — there's no saved state to display; the toggle alone carries the meaning at the create stage.
 
-  - [ ] 16.7 Mount `<PublishedToggle>` in `BriefForm.tsx`'s title-row toolbar.
+  - [x] 16.7 Mount `<PublishedToggle>` in `BriefForm.tsx`'s title-row toolbar.
     - Position: **immediately to the LEFT of the Run Now button** in both view and edit modes. When Run Now is absent (e.g. on `/briefs/new`), the toggle still renders in the same horizontal slot.
     - In view mode the toggle is read-only (the `disabled={mode === "view"}` from 16.5); a click-and-toggle in view mode does NOT enter edit mode — same UX as clicking other read-only form fields. Users explicitly enter edit mode via the Edit button.
     - In edit mode the toggle is interactive; the new value is part of the RHF form state and ships with Save.
