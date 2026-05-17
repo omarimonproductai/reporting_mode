@@ -36,6 +36,7 @@ tasks/                        PRD + task list driving the current iteration
   - `GITHUB_OWNER`, `GITHUB_REPO` — `omarimonagentai` / `reporting_mode`.
   - `SLACK_BOT_TOKEN` — for the channel picker (`/api/channels`).
   - `CRON_SECRET` — 32+ byte random string (`openssl rand -hex 32`) shared between Vercel Cron and `/api/scheduler/tick`. Vercel Cron auto-injects it as the `Authorization: Bearer …` header; the endpoint rejects mismatches with 401.
+  - `GROQ_API_KEY` — same value already in GitHub Secrets for the executor pipeline; the web app needs it for the dry-run endpoint (`/api/briefs/dry-run`). Copy the existing GitHub Secret into Vercel env vars (Production + Preview, encrypted).
 
 ## Python executor
 
@@ -102,3 +103,4 @@ The active iteration is tracked in `tasks/tasks-online-brief-platform.md`. Major
 - 15.0 ✅ Sidebar brief actions menu — per-row kebab exposing Edit, Run Now, History without navigating.
 - 16.0 ⏳ Publish/Unpublish briefs — Draft state gates the cron auto-dispatch; new briefs default to Draft; Run Now requires confirmation when dispatching a draft.
 - 17.0 ⏳ Mode data preview — inline «Preview data» button on each BriefForm query row; right-side Sheet shows the last 10 rows of the latest successful Mode run, validating wiring before save.
+- 18.0 ⏳ Dry-run output — «Preview output» from detail header, form footer or sidebar kebab streams a no-Slack, no-commit dry-run of the brief; 5-15 s end-to-end with progressive markdown rendering.

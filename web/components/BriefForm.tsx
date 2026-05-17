@@ -16,6 +16,7 @@ import { Info, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ChannelCombobox } from "@/components/ChannelCombobox";
+import { DryRunButton } from "@/components/DryRunButton";
 import { PreviewButton } from "@/components/PreviewButton";
 import { PreviewSheet } from "@/components/PreviewSheet";
 import { QueryCombobox } from "@/components/QueryCombobox";
@@ -554,6 +555,7 @@ export function BriefForm(props: Props) {
     reset,
     control,
     trigger,
+    getValues,
     formState: { errors, isValid, touchedFields, isSubmitted },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -912,6 +914,14 @@ export function BriefForm(props: Props) {
           {actionButtons}
         </div>
         {validityHint}
+        {isEditing && (
+          <div className="mt-3 flex justify-end">
+            <DryRunButton
+              mode="form"
+              getBrief={() => getValues() as Brief}
+            />
+          </div>
+        )}
       </div>
 
       {!isCreate && mode === "view" && (

@@ -724,7 +724,7 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     - On `request.signal.aborted`, the route exits cleanly: the GROQ stream's `signal` aborts → the SDK closes the HTTP connection → the generator completes without yielding further events.
     - The 502/error mapping happens at the route level: a `try/catch` around the orchestrator wraps any unexpected exception into a final SSE `error` event before closing the stream (so the client always sees a well-formed terminator instead of a torn connection).
 
-  - [ ] 18.6 Implement `web/components/DryRunSheet.tsx` — the controlled side-panel that renders the streamed output.
+  - [x] 18.6 Implement `web/components/DryRunSheet.tsx` — the controlled side-panel that renders the streamed output.
     - Client component. shadcn `Sheet side="right"`, `SheetContent className="sm:max-w-2xl"` so the markdown body has room to breathe.
     - Props: `{ open: boolean; payload: Brief | null; onClose: () => void }`. Parent (the DryRunProvider in 18.8) owns the state; the Sheet is fully controlled.
     - State machine: `{ status: "idle" | "loading-mode" | "streaming-groq" | "ready" | "cancelled" | "error"; markdown: string; usage?: TokenUsage; error?: string }`. Transitions:
@@ -736,12 +736,12 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
       - Cancel button click OR Sheet close: AbortController.abort() → status → `"cancelled"`, markdown stays as-is (partial output preserved).
     - Body layout: phase indicator at top (Catalan narrative + spinner during loading-mode / streaming-groq), `<BriefMarkdown>` rendering the accumulated markdown (re-renders incrementally as chunks arrive), token usage line at the foot (visible after `ready`), Cancel button at top right (visible during the two loading phases).
 
-  - [ ] 18.7 Implement the SSE consumer inside `DryRunSheet` using `fetch` + `ReadableStream` reader.
+  - [x] 18.7 Implement the SSE consumer inside `DryRunSheet` using `fetch` + `ReadableStream` reader.
     - When `open && payload`: create `AbortController`, do `fetch("/api/briefs/dry-run", { method: "POST", body: JSON.stringify(payload), signal: controller.signal })`. Read response body via `res.body.getReader()`; decode chunks via `new TextDecoder()`; buffer-and-split lines on `\n\n` (SSE message boundary); for each complete message, parse the `event:` + `data:` lines and dispatch into the state machine.
     - Cleanup: `useEffect`'s return function calls `controller.abort()`. The cleanup fires when `open` flips to `false`, when `payload` changes (which it shouldn't mid-run but defensively), or when the component unmounts.
     - Reuse the same fetch-streaming pattern Vercel's docs recommend for Node-runtime streamed endpoints (EventSource has flaky proxy behaviour in the Vercel edge layer for Node-runtime sources, per their own documentation).
 
-  - [ ] 18.8 Implement `web/hooks/useDryRun.tsx` — the React Context that the three trigger surfaces share.
+  - [x] 18.8 Implement `web/hooks/useDryRun.tsx` — the React Context that the three trigger surfaces share.
     - Exports `DryRunProvider` (a client component wrapping `children` and mounting one `<DryRunSheet>` instance at its root) and `useDryRun()` (hook returning `{ run: (brief: Brief) => void }`).
     - Provider state: `const [dryRun, setDryRun] = useState<{ payload: Brief } | null>(null);`. The `run(brief)` callback sets `{ payload: brief }`; the Sheet's `onClose` callback resets to `null`.
     - Mount the provider as high as practical so all three triggers can access it. Two options:
@@ -749,7 +749,7 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
       - Mount at each of the three trigger points → smaller root bundle but the surfaces don't share state (closing the sheet on one trigger doesn't reset the others; each manages its own).
     - Default to the **first approach** (root mount). The bundle delta is negligible (<5 KB gz) and the shared-state semantics are simpler.
 
-  - [ ] 18.9 Implement `web/components/DryRunButton.tsx` — the trigger button shape used by the three surfaces.
+  - [x] 18.9 Implement `web/components/DryRunButton.tsx` — the trigger button shape used by the three surfaces.
     - Two prop shapes via discriminated union:
       ```ts
       type Props =
@@ -760,13 +760,13 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     - The form-mode closure path is critical: the BriefForm passes `() => getValues()` (RHF) so the button reads the LATEST form values at click time, not the values that existed at render time. Without this, a user editing for a few minutes then clicking Preview output would dry-run against stale values.
     - Disabled state: when the brief fails a quick `briefSchema.safeParse(brief)` validation (e.g. empty required fields), show the disabled button with a Catalan Tooltip («Omple els camps obligatoris abans de fer preview»). Same idiom RunNowButton uses on create mode.
 
-  - [ ] 18.10 Mount `DryRunButton mode="persisted"` in the **detail page header** (`app/briefs/[name]/page.tsx`), immediately to the LEFT of the Run Now button. Pass `brief={brief}` (the parsed YAML, already in scope). The DryRunProvider must be mounted at `app/layout.tsx` (per 18.8) so the button can find the context.
+  - [x] 18.10 Mount `DryRunButton mode="persisted"` in the **detail page header** (`app/briefs/[name]/page.tsx`), immediately to the LEFT of the Run Now button. Pass `brief={brief}` (the parsed YAML, already in scope). The DryRunProvider must be mounted at `app/layout.tsx` (per 18.8) so the button can find the context.
 
-  - [ ] 18.11 Mount `DryRunButton mode="form"` in the **form footer in edit mode** (`components/BriefForm.tsx`). Position: a separate row below the existing action row (Edit / Cancel + Save), visible only when `mode === "edit"`. Pass `getBrief={() => methods.getValues()}` where `methods` is the RHF `useForm()` return. The button is rendered in BOTH new-brief mode and existing-brief edit mode (the dry-run is brief-state-only; doesn't care if the brief is persisted).
+  - [x] 18.11 Mount `DryRunButton mode="form"` in the **form footer in edit mode** (`components/BriefForm.tsx`). Position: a separate row below the existing action row (Edit / Cancel + Save), visible only when `mode === "edit"`. Pass `getBrief={() => methods.getValues()}` where `methods` is the RHF `useForm()` return. The button is rendered in BOTH new-brief mode and existing-brief edit mode (the dry-run is brief-state-only; doesn't care if the brief is persisted).
 
-  - [ ] 18.12 Mount a new `DryRunButton mode="persisted"` entry in the **sidebar kebab** (`components/BriefRowMenu.tsx`). Position: below the existing «History» entry. Each row needs the parsed brief (not just the filename) so the kebab consumer must receive `brief` as a prop from `BriefSidebarList`. The list builder (`getBriefListWithRuns`) already parses each brief; extend the row shape to include the full `Brief` (or the minimum fields the dry-run needs — schema validation will reject anything not matching `briefSchema`, so the full payload is safest).
+  - [x] 18.12 Mount a Preview-output entry in the **sidebar kebab** (`components/BriefRowMenu.tsx`). Position: below the existing «History» entry. **Implementation deviation from the sub-task spec**: instead of propagating the full Brief through `BriefSidebarList` (which would inflate the sidebar payload by ~5 KB per brief), the kebab does a **lazy GET to `/api/briefs/[filename]`** when the user clicks Preview output. The fetched payload is then validated via `briefSchema.safeParse` and passed to `useDryRun().run(brief)`. Cost: one extra HTTP round-trip on click (~100 ms in practice; the brief is already cached server-side). Benefit: sidebar payload stays trim, the existing `BriefListItem` shape doesn't grow a heavy `brief: Brief` field. The kebab button shows a spinner during the fetch.
 
-  - [ ] 18.13 README env-var doc + roadmap entry.
+  - [x] 18.13 README env-var doc + roadmap entry.
     - Add `GROQ_API_KEY` to the web-app env-vars list in README's «Web app» section (placement next to the existing `MODE_TOKEN` block). Note that the value already exists in GitHub Secrets — operator copies it into Vercel.
     - Append to Roadmap: «18.0 ⏳ Dry-run output — «Preview output» from detail header, form footer or sidebar kebab streams a no-Slack, no-commit dry-run of the brief; 5-15 s end-to-end with progressive markdown rendering.». Flip to ✅ at merge time.
 

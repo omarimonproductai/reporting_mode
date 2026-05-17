@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Edit, History, MoreVertical, Play } from "lucide-react";
+import {
+  Edit,
+  History,
+  Loader2,
+  MoreVertical,
+  Play,
+  Sparkles,
+} from "lucide-react";
 import { DraftRunConfirmDialog } from "@/components/DraftRunConfirmDialog";
 import { PublishToggleButton } from "@/components/PublishToggleButton";
 import {
@@ -11,6 +18,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatMmSs, useRunNow } from "@/hooks/useRunNow";
+import { useDryRun } from "@/hooks/useDryRun";
+import { briefSchema } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -26,7 +35,9 @@ export function BriefRowMenu({
 }: Props) {
   const { running, onCooldown, remainingSeconds, dispatch } =
     useRunNow(filename);
+  const { run } = useDryRun();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const runDisabled = running || onCooldown;
   const runLabel = running
@@ -46,6 +57,27 @@ export function BriefRowMenu({
   function onConfirm() {
     setConfirmOpen(false);
     void dispatch();
+  }
+
+  async function onPreviewOutput() {
+    if (previewLoading) return;
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(`/api/briefs/${filename}`);
+      if (!res.ok) throw new Error(`Failed to load brief: ${res.status}`);
+      const body = (await res.json()) as { brief: unknown };
+      const parsed = briefSchema.safeParse(body.brief);
+      if (!parsed.success) {
+        throw new Error("Brief failed schema validation");
+      }
+      run(parsed.data);
+    } catch {
+      // Silently fail — the user can retry. The detail-page Preview
+      // output button is the more reliable path; the kebab item is a
+      // shortcut.
+    } finally {
+      setPreviewLoading(false);
+    }
   }
 
   return (
@@ -95,6 +127,23 @@ export function BriefRowMenu({
             icon={<History className="size-4 text-zinc-500" />}
             label="History"
           />
+          <button
+            type="button"
+            disabled={previewLoading}
+            onClick={onPreviewOutput}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors",
+              "text-zinc-700 hover:bg-zinc-100",
+              "disabled:cursor-not-allowed disabled:text-zinc-400 disabled:hover:bg-transparent"
+            )}
+          >
+            {previewLoading ? (
+              <Loader2 className="size-4 animate-spin text-zinc-500" />
+            ) : (
+              <Sparkles className="size-4 text-zinc-500" />
+            )}
+            Preview output
+          </button>
           <PublishToggleButton
             filename={filename}
             published={published}

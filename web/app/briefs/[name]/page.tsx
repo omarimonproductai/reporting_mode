@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { BriefForm } from "@/components/BriefForm";
+import { DryRunButton } from "@/components/DryRunButton";
 import { ExecutionMetadata } from "@/components/ExecutionMetadata";
 import { HistoryDrawerButton } from "@/components/HistoryDrawerButton";
 import { PublishToggleButton } from "@/components/PublishToggleButton";
@@ -60,6 +61,11 @@ export default async function BriefDetailPage({ params, searchParams }: Params) 
               <PublishToggleButton
                 filename={name}
                 published={brief.published}
+              />
+              <DryRunButton
+                mode="persisted"
+                brief={brief}
+                filename={name}
               />
               <RunNowButton
                 mode="existing"

@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { DryRunProvider } from "@/hooks/useDryRun";
 import "./globals.css";
 
 const inter = Inter({
@@ -39,27 +40,29 @@ export default function RootLayout({
     >
       <body className="min-h-full">
         <TooltipProvider>
-        <div className="flex min-h-screen">
-          <aside className="w-[280px] shrink-0 border-r border-zinc-200 bg-white flex flex-col">
-            <div className="flex-1 overflow-y-auto">
-              <Suspense fallback={<SidebarSkeleton />}>
-                <BriefSidebar />
-              </Suspense>
-            </div>
-            <Suspense
-              fallback={
-                <div className="px-4 py-3 text-[11px] text-zinc-400 font-mono">
-                  Carregant versió…
+          <DryRunProvider>
+            <div className="flex min-h-screen">
+              <aside className="w-[280px] shrink-0 border-r border-zinc-200 bg-white flex flex-col">
+                <div className="flex-1 overflow-y-auto">
+                  <Suspense fallback={<SidebarSkeleton />}>
+                    <BriefSidebar />
+                  </Suspense>
                 </div>
-              }
-            >
-              <Footer />
-            </Suspense>
-          </aside>
+                <Suspense
+                  fallback={
+                    <div className="px-4 py-3 text-[11px] text-zinc-400 font-mono">
+                      Carregant versió…
+                    </div>
+                  }
+                >
+                  <Footer />
+                </Suspense>
+              </aside>
 
-          <main className="flex-1 overflow-y-auto">{children}</main>
-        </div>
-        <Toaster />
+              <main className="flex-1 overflow-y-auto">{children}</main>
+            </div>
+            <Toaster />
+          </DryRunProvider>
         </TooltipProvider>
       </body>
     </html>
