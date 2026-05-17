@@ -16,6 +16,8 @@ import { Info, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ChannelCombobox } from "@/components/ChannelCombobox";
+import { PreviewButton } from "@/components/PreviewButton";
+import { PreviewSheet } from "@/components/PreviewSheet";
 import { QueryCombobox } from "@/components/QueryCombobox";
 import { ReportCombobox } from "@/components/ReportCombobox";
 import { CronBuilder } from "@/components/CronBuilder";
@@ -263,6 +265,7 @@ type SourceCardProps = {
   onRemoveSource: () => void;
   canRemoveSource: boolean;
   shouldShowError: (name: string) => boolean;
+  onPreview: (reportToken: string, queryToken: string) => void;
 };
 
 function SourceCard({
@@ -273,6 +276,7 @@ function SourceCard({
   onRemoveSource,
   canRemoveSource,
   shouldShowError,
+  onPreview,
 }: SourceCardProps) {
   const queries = useFieldArray({
     control,
@@ -372,39 +376,58 @@ function SourceCard({
                 key={queryField.id}
                 className="flex items-start gap-3 rounded-md border border-zinc-100 bg-zinc-50 px-3 py-2"
               >
-                <div className="flex-1">
-                  {isEditing ? (
-                    <Controller
-                      control={control}
-                      name={
-                        `sources.${sourceIdx}.queries.${qIdx}.token` as const
-                      }
-                      render={({ field }) => (
-                        <QueryCombobox
-                          value={field.value}
-                          onChange={field.onChange}
-                          reportToken={watchedReportToken}
-                          ariaInvalid={showTokenErr && !!queryErrors?.token}
-                        />
-                      )}
-                    />
-                  ) : (
-                    <Controller
-                      control={control}
-                      name={
-                        `sources.${sourceIdx}.queries.${qIdx}.token` as const
-                      }
-                      render={({ field }) => (
-                        <QueryReadonly
-                          value={field.value}
-                          reportToken={watchedReportToken}
-                        />
-                      )}
-                    />
-                  )}
-                  {showTokenErr && (
-                    <FieldError message={queryErrors?.token?.message} />
-                  )}
+                <div className="flex flex-1 items-start gap-2">
+                  <div className="flex-1">
+                    {isEditing ? (
+                      <Controller
+                        control={control}
+                        name={
+                          `sources.${sourceIdx}.queries.${qIdx}.token` as const
+                        }
+                        render={({ field }) => (
+                          <>
+                            <QueryCombobox
+                              value={field.value}
+                              onChange={field.onChange}
+                              reportToken={watchedReportToken}
+                              ariaInvalid={
+                                showTokenErr && !!queryErrors?.token
+                              }
+                            />
+                          </>
+                        )}
+                      />
+                    ) : (
+                      <Controller
+                        control={control}
+                        name={
+                          `sources.${sourceIdx}.queries.${qIdx}.token` as const
+                        }
+                        render={({ field }) => (
+                          <QueryReadonly
+                            value={field.value}
+                            reportToken={watchedReportToken}
+                          />
+                        )}
+                      />
+                    )}
+                    {showTokenErr && (
+                      <FieldError message={queryErrors?.token?.message} />
+                    )}
+                  </div>
+                  <Controller
+                    control={control}
+                    name={
+                      `sources.${sourceIdx}.queries.${qIdx}.token` as const
+                    }
+                    render={({ field }) => (
+                      <PreviewButton
+                        reportToken={watchedReportToken}
+                        queryToken={field.value}
+                        onClick={onPreview}
+                      />
+                    )}
+                  />
                 </div>
 
                 <label className="flex shrink-0 items-center gap-2 pt-2 text-sm text-zinc-700">
@@ -539,6 +562,9 @@ export function BriefForm(props: Props) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [preview, setPreview] = useState<
+    { reportToken: string; queryToken: string } | null
+  >(null);
 
   const isEditing = mode === "edit";
 
@@ -727,6 +753,9 @@ export function BriefForm(props: Props) {
                 onRemoveSource={() => sources.remove(sIdx)}
                 canRemoveSource={sources.fields.length > 1}
                 shouldShowError={shouldShowError}
+                onPreview={(reportToken, queryToken) =>
+                  setPreview({ reportToken, queryToken })
+                }
               />
             ))}
             {isEditing && (
@@ -892,6 +921,13 @@ export function BriefForm(props: Props) {
           <span className="font-mono">{props.filename}.yml</span>
         </p>
       )}
+
+      <PreviewSheet
+        open={preview !== null}
+        reportToken={preview?.reportToken ?? null}
+        queryToken={preview?.queryToken ?? null}
+        onClose={() => setPreview(null)}
+      />
 
       {!isCreate && (
         <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

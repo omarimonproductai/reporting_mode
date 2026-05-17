@@ -657,13 +657,13 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     - `kind: "query-not-found"` → muted info block: «Aquesta query no apareix dins de l'últim run del report. Pot ser que s'hagi renombrat o esborrat a Mode.»
     - `error` (the catch path, distinct from `kind: "run-failed"` which is a successful 200 response) → red Alert: «Mode no disponible — torna a provar més tard» + Retry button that calls `refresh()` (which fires `?force=true`).
 
-  - [ ] 17.12 Implement `PreviewButton` (`web/components/PreviewButton.tsx`) — the ghost button rendered next to each `QueryCombobox` row.
+  - [x] 17.12 Implement `PreviewButton` (`web/components/PreviewButton.tsx`) — the ghost button rendered next to each `QueryCombobox` row.
     - Client component. Props: `{ reportToken: string; queryToken: string; onClick: (report: string, query: string) => void; }`.
     - Layout: `<Button variant="ghost" size="sm">` with lucide `Eye` icon + the English label «Preview data». `disabled` when `!reportToken || !queryToken`.
     - Disabled-state tooltip: wrap in shadcn `Tooltip` rendering «Selecciona report i query abans de fer preview» on hover/focus. Wrap the disabled button in a `<span tabIndex={0}>` so Radix Tooltip receives the hover event even though `pointer-events: none` is on the disabled child — same idiom `RunNowButton` already uses for the create-mode disabled state.
     - Click handler: `() => onClick(reportToken, queryToken)`. The parent (`BriefForm`) maps that to its preview-state setter.
 
-  - [ ] 17.13 Plumb `PreviewSheet` state into `BriefForm.tsx` and mount one `PreviewSheet` instance at the form root.
+  - [x] 17.13 Plumb `PreviewSheet` state into `BriefForm.tsx` and mount one `PreviewSheet` instance at the form root.
     - New state slice inside `BriefForm`: `const [preview, setPreview] = useState<{ reportToken: string; queryToken: string } | null>(null);`. Single state shared across all query rows so we never paint two Sheets at once.
     - Mount `<PreviewSheet open={preview !== null} reportToken={preview?.reportToken ?? null} queryToken={preview?.queryToken ?? null} onClose={() => setPreview(null)} />` at the bottom of the form's JSX, next to the other top-level dialogs (Delete dialog at line ~872, Cancel-create dialog at line ~904 — pattern is the same).
     - Each query row inside `SourceCard` renders `<PreviewButton reportToken={...} queryToken={...} onClick={(r, q) => setPreview({ reportToken: r, queryToken: q })} />`. The button sits immediately to the right of `<QueryCombobox>` in the query row's flex container. The current `mode_report_token` for the parent source is already in scope via the `Controller` watching `sources.<i>.mode_report_token` — reuse the same `useWatch`.
