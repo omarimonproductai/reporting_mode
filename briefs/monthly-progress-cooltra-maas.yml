@@ -1,0 +1,12 @@
+name: MONTHLY PROGRESS (Cooltra&MaaS)
+schedule: 0 10 * * *
+slack_channel: testing-canal-nou-eliminar
+sources:
+  - mode_report_token: 973b3069a60d
+    queries:
+      - token: 34224cc6daa3
+        csv: false
+      - token: cbaac7bd14cb
+        csv: false
+prompt: Arribarem a cumplir amb el BBPP aquest mes?
+owner_email: null
