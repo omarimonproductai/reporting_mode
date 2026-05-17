@@ -68,6 +68,11 @@ type CreateProps = {
   // string). Empty / undefined means no prefill — start from the
   // empty brief.
   prefillReportToken?: string;
+  // Optional Mode query token to pre-fill in the first source's
+  // first query slot. Paired with prefillReportToken — both flow
+  // from the catalog «Create brief» CTA which now passes both the
+  // report and the specific query the user clicked on.
+  prefillQueryToken?: string;
   // Same slot as on EditProps for create-flow consistency.
   briefActions?: React.ReactNode;
 };
@@ -498,6 +503,14 @@ export function BriefForm(props: Props) {
             {
               ...EMPTY_BRIEF.sources[0],
               mode_report_token: props.prefillReportToken,
+              queries: props.prefillQueryToken
+                ? [
+                    {
+                      ...EMPTY_BRIEF.sources[0].queries[0],
+                      token: props.prefillQueryToken,
+                    },
+                  ]
+                : EMPTY_BRIEF.sources[0].queries,
             },
           ],
         }

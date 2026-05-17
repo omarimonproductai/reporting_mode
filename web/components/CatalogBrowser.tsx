@@ -257,7 +257,9 @@ function QueryRow({
                 0 briefs
               </Badge>
               <Button asChild size="xs" variant="ghost">
-                <Link href={`/briefs/new?prefill_report=${reportToken}`}>
+                <Link
+                  href={`/briefs/new?prefill_report=${reportToken}&prefill_query=${token}`}
+                >
                   <Plus />
                   Create brief
                 </Link>

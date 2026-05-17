@@ -2,12 +2,13 @@ import { BriefForm } from "@/components/BriefForm";
 import { RunNowButton } from "@/components/RunNowButton";
 
 type Props = {
-  searchParams: Promise<{ prefill_report?: string }>;
+  searchParams: Promise<{ prefill_report?: string; prefill_query?: string }>;
 };
 
 export default async function NewBriefPage({ searchParams }: Props) {
-  const { prefill_report } = await searchParams;
+  const { prefill_report, prefill_query } = await searchParams;
   const prefillReport = prefill_report?.trim() ?? "";
+  const prefillQuery = prefill_query?.trim() ?? "";
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-10">
@@ -20,6 +21,7 @@ export default async function NewBriefPage({ searchParams }: Props) {
         <BriefForm
           intent="create"
           prefillReportToken={prefillReport || undefined}
+          prefillQueryToken={prefillQuery || undefined}
           briefActions={<RunNowButton mode="create" />}
         />
       </div>

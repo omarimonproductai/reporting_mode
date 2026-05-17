@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, GripVertical, RefreshCw } from "lucide-react";
 import { PreviewTable } from "@/components/PreviewTable";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,21 @@ type Props = {
   onClose: () => void;
 };
 
+const WIDTH_STORAGE_KEY = "preview-sheet:width";
+const MIN_WIDTH = 480;
+const MAX_WIDTH = 1400;
+const DEFAULT_WIDTH = 672;
+
+function loadWidth(): number {
+  if (typeof window === "undefined") return DEFAULT_WIDTH;
+  const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
+  const n = raw ? parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(n) || n < MIN_WIDTH || n > MAX_WIDTH) {
+    return DEFAULT_WIDTH;
+  }
+  return n;
+}
+
 type State =
   | { kind: "idle" }
   | { kind: "loading" }
@@ -38,6 +53,49 @@ export function PreviewSheet({
 }: Props) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const [width, setWidth] = useState<number>(DEFAULT_WIDTH);
+  const [dragging, setDragging] = useState(false);
+  const dragStateRef = useRef<{ startX: number; startWidth: number } | null>(
+    null
+  );
+
+  useEffect(() => {
+    setWidth(loadWidth());
+  }, []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    function onMove(e: PointerEvent) {
+      const s = dragStateRef.current;
+      if (!s) return;
+      const dx = s.startX - e.clientX;
+      const next = Math.max(
+        MIN_WIDTH,
+        Math.min(MAX_WIDTH, s.startWidth + dx)
+      );
+      setWidth(next);
+    }
+    function onUp() {
+      setDragging(false);
+      dragStateRef.current = null;
+      try {
+        window.localStorage.setItem(WIDTH_STORAGE_KEY, String(width));
+      } catch {
+        // ignore quota / disabled storage
+      }
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [dragging, width]);
+
+  function onDragStart(e: React.PointerEvent<HTMLDivElement>) {
+    dragStateRef.current = { startX: e.clientX, startWidth: width };
+    setDragging(true);
+  }
 
   useEffect(() => {
     if (!open || !reportToken || !queryToken) {
@@ -93,8 +151,19 @@ export function PreviewSheet({
         if (!next) onClose();
       }}
     >
-      <SheetContent side="right" className="w-full sm:max-w-2xl">
-        <SheetHeader>
+      <SheetContent
+        side="right"
+        className="flex flex-col p-0 sm:max-w-none"
+        style={{ width: `${width}px` }}
+      >
+        <div
+          onPointerDown={onDragStart}
+          aria-hidden
+          className="group absolute inset-y-0 left-0 z-30 flex w-2 cursor-col-resize items-center justify-center transition-colors hover:bg-zinc-100"
+        >
+          <GripVertical className="size-3 text-zinc-300 transition-colors group-hover:text-zinc-500" />
+        </div>
+        <SheetHeader className="shrink-0 pr-12">
           <SheetTitle>
             <PreviewHeader
               reportToken={reportToken}
@@ -107,7 +176,7 @@ export function PreviewSheet({
             Vista prèvia de l&apos;última execució de la query a Mode.
           </SheetDescription>
         </SheetHeader>
-        <div className="px-4 pb-6">
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
           <PreviewBody state={state} onRetry={refresh} />
         </div>
       </SheetContent>
