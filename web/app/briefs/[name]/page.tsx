@@ -33,12 +33,12 @@ export default async function BriefDetailPage({ params }: Params) {
           </h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <RunNowButton mode="existing" filename={name} />
           <HistoryDrawerButton
             filename={name}
             briefName={brief.name}
             slackChannel={brief.slack_channel}
           />
-          <RunNowButton mode="existing" filename={name} />
         </div>
       </div>
 
