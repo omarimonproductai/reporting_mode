@@ -25,7 +25,7 @@ function authorize(request: Request): boolean {
   return crypto.timingSafeEqual(headerBuf, expectedBuf);
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
   if (!authorize(request)) {
     return new NextResponse(null, { status: 401 });
   }
