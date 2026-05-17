@@ -479,6 +479,29 @@ export function BriefForm(props: Props) {
   const [brief, setBrief] = useState(initialBrief);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Re-sync `sha` from props when the server re-renders with a
+  // newer persisted state — e.g. PublishToggleButton mutates the
+  // YAML behind us → router.refresh() → page passes the new
+  // initialSha down. Without this, the form keeps the stale SHA
+  // from initial mount and the next Save / Delete hits GitHub with
+  // a SHA that no longer matches the current blob, surfacing as a
+  // 409 «does not match» error.
+  //
+  // We deliberately do NOT re-sync `brief` state: that would clobber
+  // in-progress user edits whenever a peripheral mutation lands. The
+  // form is the source of truth for the editable fields once mounted;
+  // external mutations only affect non-form state (the `published`
+  // flag, which the form no longer renders since the toggle moved
+  // to a top-level action button).
+  const persistedSha = isCreate ? "" : props.initialSha;
+  useEffect(() => {
+    if (isCreate) return;
+    if (persistedSha && persistedSha !== sha) {
+      setSha(persistedSha);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistedSha]);
+
   const defaultValues = useMemo<FormValues>(() => brief, [brief]);
 
   const {
