@@ -4,7 +4,6 @@ import { DryRunButton } from "@/components/DryRunButton";
 import { ExecutionMetadata } from "@/components/ExecutionMetadata";
 import { HistoryDrawerButton } from "@/components/HistoryDrawerButton";
 import { PublishToggleButton } from "@/components/PublishToggleButton";
-import { PublishedBadge } from "@/components/PublishedBadge";
 import { RunNowButton } from "@/components/RunNowButton";
 import { BriefNotFoundError, readBrief } from "@/lib/github";
 import { parseBrief } from "@/lib/yaml";
@@ -39,50 +38,38 @@ export default async function BriefDetailPage({ params, searchParams }: Params) 
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-10">
-      <div className="flex items-center gap-2">
-        <h1 className="min-w-0 truncate text-2xl font-semibold text-zinc-900">
-          {brief.name}
-        </h1>
-        <PublishedBadge published={brief.published} className="shrink-0" />
-      </div>
-
-      <div className="mt-6">
-        <ExecutionMetadata filename={name} />
-      </div>
-
-      <div className="mt-8">
-        <BriefForm
-          filename={name}
-          initialBrief={brief}
-          initialSha={sha}
-          initialMode={initialEdit ? "edit" : "view"}
-          briefActions={
-            <>
-              <PublishToggleButton
-                filename={name}
-                published={brief.published}
-              />
-              <DryRunButton
-                mode="persisted"
-                brief={brief}
-                filename={name}
-              />
-              <RunNowButton
-                mode="existing"
-                filename={name}
-                published={brief.published}
-                briefName={brief.name}
-              />
-              <HistoryDrawerButton
-                filename={name}
-                briefName={brief.name}
-                slackChannel={brief.slack_channel}
-                initialOpen={initialHistory}
-              />
-            </>
-          }
-        />
-      </div>
+      <BriefForm
+        filename={name}
+        initialBrief={brief}
+        initialSha={sha}
+        initialMode={initialEdit ? "edit" : "view"}
+        metadataSlot={<ExecutionMetadata filename={name} />}
+        briefActions={
+          <>
+            <PublishToggleButton
+              filename={name}
+              published={brief.published}
+            />
+            <DryRunButton
+              mode="persisted"
+              brief={brief}
+              filename={name}
+            />
+            <RunNowButton
+              mode="existing"
+              filename={name}
+              published={brief.published}
+              briefName={brief.name}
+            />
+            <HistoryDrawerButton
+              filename={name}
+              briefName={brief.name}
+              slackChannel={brief.slack_channel}
+              initialOpen={initialHistory}
+            />
+          </>
+        }
+      />
     </div>
   );
 }
