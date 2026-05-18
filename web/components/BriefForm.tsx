@@ -801,57 +801,60 @@ export function BriefForm(props: Props) {
           aria-hidden
           className="pointer-events-none absolute -top-px left-0 h-px w-px"
         />
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            {isEditing ? (
-              <>
-                <Input
-                  id="name"
-                  {...register("name")}
-                  aria-invalid={shouldShowError("name") && !!errors.name}
-                  placeholder="Posa-li un nom · ex: App version adoption — weekly"
-                  className={cn(
-                    "h-auto min-w-0 flex-1 border-0 border-b-2 border-transparent bg-transparent px-0 font-semibold text-zinc-900 placeholder:font-normal placeholder:text-zinc-500 placeholder-shown:border-dashed placeholder-shown:border-zinc-300 shadow-none transition-[font-size,border-color] duration-150 focus-visible:ring-0",
-                    stuck ? "text-base" : "text-2xl"
-                  )}
-                />
-                <FieldHint text={FIELD_HELP.name} label="Brief Name" />
-              </>
-            ) : (
-              <>
-                <h1
-                  className={cn(
-                    "min-w-0 truncate font-semibold text-zinc-900 transition-[font-size] duration-150",
-                    stuck ? "text-base" : "text-2xl"
-                  )}
-                >
-                  {brief.name}
-                </h1>
-                {!isCreate && (
-                  <PublishedBadge
-                    published={brief.published}
-                    className="shrink-0"
-                  />
+        <div className="flex min-w-0 items-center gap-2">
+          {isEditing ? (
+            <>
+              <Input
+                id="name"
+                {...register("name")}
+                aria-invalid={shouldShowError("name") && !!errors.name}
+                placeholder="Posa-li un nom · ex: App version adoption — weekly"
+                className={cn(
+                  "h-auto min-w-0 flex-1 border-0 border-b-2 border-transparent bg-transparent px-0 font-semibold text-zinc-900 placeholder:font-normal placeholder:text-zinc-500 placeholder-shown:border-dashed placeholder-shown:border-zinc-300 shadow-none transition-[font-size,border-color] duration-150 focus-visible:ring-0",
+                  stuck ? "text-base" : "text-2xl"
                 )}
-              </>
-            )}
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            {actionButtons}
-            {isEditing && (
-              <DryRunButton
-                mode="form"
-                getBrief={() => getValues() as Brief}
-                disabled={!isValid}
-                filename={isCreate ? undefined : props.filename}
               />
-            )}
-            {props.briefActions}
-          </div>
+              <FieldHint text={FIELD_HELP.name} label="Brief Name" />
+            </>
+          ) : (
+            <>
+              <h1
+                className={cn(
+                  "min-w-0 truncate font-semibold text-zinc-900 transition-[font-size] duration-150",
+                  stuck ? "text-base" : "text-2xl"
+                )}
+              >
+                {brief.name}
+              </h1>
+              {!isCreate && (
+                <PublishedBadge
+                  published={brief.published}
+                  className="shrink-0"
+                />
+              )}
+            </>
+          )}
         </div>
         {shouldShowError("name") && (
           <FieldError message={errors.name?.message} />
         )}
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2 transition-[margin] duration-150",
+            stuck ? "mt-2" : "mt-3"
+          )}
+        >
+          {actionButtons}
+          {isEditing && (
+            <DryRunButton
+              mode="form"
+              getBrief={() => getValues() as Brief}
+              disabled={!isValid}
+              filename={isCreate ? undefined : props.filename}
+            />
+          )}
+          {props.briefActions}
+        </div>
       </div>
 
       {/* Validity hint lives just below the sticky bar (not inside it)
