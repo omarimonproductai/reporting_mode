@@ -352,6 +352,30 @@ def rows_to_csv(rows):
     return buffer.getvalue()
 
 
+def rows_to_markdown(rows):
+    """Serialise a list of dicts to a GitHub-flavoured markdown table.
+
+    Experimental alternative to `rows_to_csv` for Slack attachments —
+    Slack renders `.md` files as text but the table syntax stays
+    readable even unrendered (aligned pipes + dashes header). Pipe
+    chars in cell values are escaped; newlines collapsed to spaces so
+    each row stays on one line.
+    """
+    if not rows:
+        return ""
+    headers = list(rows[0].keys())
+    sep = "| " + " | ".join(["---"] * len(headers)) + " |"
+    lines = ["| " + " | ".join(headers) + " |", sep]
+    for row in rows:
+        cells = []
+        for h in headers:
+            v = row.get(h, "")
+            s = "" if v is None else str(v)
+            cells.append(s.replace("|", "\\|").replace("\n", " "))
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
 def slugify_for_filename(text):
     return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_") or "data"
 
@@ -407,17 +431,22 @@ def post_brief_to_slack(brief, sources_data, brief_text, raw_mode=False):
     if not csv_queue:
         return
 
-    print("-> Pujant CSVs com a thread replies...")
+    # EXPERIMENT 2026-05-18: attaching as markdown (.md) instead of
+    # CSV to see how Slack renders the file preview. The user-facing
+    # copy in the web UI keeps saying "CSV"; this is a backend-only
+    # swap. To revert, change `rows_to_markdown` → `rows_to_csv` and
+    # `.md` → `.csv` below.
+    print("-> Pujant adjunts (markdown experiment) com a thread replies...")
     for query_name, rows in csv_queue:
         if not rows:
             print(f"   - {query_name}: 0 files, omès")
             continue
-        csv_content = rows_to_csv(rows)
-        filename = f"{slugify_for_filename(query_name)}_{today_iso}.csv"
+        md_content = rows_to_markdown(rows)
+        filename = f"{slugify_for_filename(query_name)}_{today_iso}.md"
         client.files_upload_v2(
             channel=channel_id,
             thread_ts=thread_ts,
-            content=csv_content,
+            content=md_content,
             filename=filename,
             title=query_name,
         )
