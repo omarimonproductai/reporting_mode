@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -22,6 +22,7 @@ import { PreviewSheet } from "@/components/PreviewSheet";
 import { PromptAssistantButton } from "@/components/PromptAssistantButton";
 import { PromptAssistantSheet } from "@/components/PromptAssistantSheet";
 import { PromptAssistantProvider } from "@/hooks/usePromptAssistant";
+import { PublishedBadge } from "@/components/PublishedBadge";
 import { QueryCombobox } from "@/components/QueryCombobox";
 import { ReportCombobox } from "@/components/ReportCombobox";
 import { CronBuilder } from "@/components/CronBuilder";
@@ -48,6 +49,7 @@ import {
   EMPTY_PROMPT_NEEDS_CSV,
   type Brief,
 } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 
 type FormMode = "view" | "edit";
 
@@ -66,6 +68,10 @@ type EditProps = {
   // right side brief actions. Lets the detail page header stay just
   // the title.
   briefActions?: React.ReactNode;
+  // Slot rendered between the sticky title bar and the form content.
+  // Used by the detail page to show ExecutionMetadata under the title
+  // without breaking the «title stays sticky» promise.
+  metadataSlot?: React.ReactNode;
 };
 
 type CreateProps = {
@@ -83,6 +89,9 @@ type CreateProps = {
   prefillQueryToken?: string;
   // Same slot as on EditProps for create-flow consistency.
   briefActions?: React.ReactNode;
+  // Unused on create (kept for type symmetry with EditProps so callers
+  // can pass `<BriefForm ... metadataSlot={...}/>` uniformly).
+  metadataSlot?: React.ReactNode;
 };
 
 type Props = EditProps | CreateProps;
@@ -604,6 +613,23 @@ export function BriefForm(props: Props) {
   >(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
 
+  // Sticky-header "stuck" detection. The sentinel is a 1px element
+  // placed just above the sticky title bar; once the user scrolls past
+  // it (sentinel leaves the viewport), the title bar is treated as
+  // stuck and we collapse padding + title size for a compact look.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setStuck(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   const isEditing = mode === "edit";
 
   function enterEdit() {
@@ -759,45 +785,77 @@ export function BriefForm(props: Props) {
   return (
     <PromptAssistantProvider applyPrompt={applyAssistantPrompt}>
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">{actionButtons}</div>
-          {props.briefActions && (
-            <div className="flex flex-wrap items-center gap-2">
-              {props.briefActions}
-            </div>
-          )}
+      <div
+        className={cn(
+          "sticky top-0 z-20 -mx-8 px-8 transition-[padding,background-color,box-shadow,border-color] duration-150",
+          stuck
+            ? "border-b border-zinc-200 bg-zinc-50/95 py-3 backdrop-blur"
+            : "border-b border-transparent bg-transparent py-0"
+        )}
+      >
+        {/* Sentinel positioned 1px above the sticky header's top. The
+            IntersectionObserver toggles `stuck` exactly when the
+            header crosses top:0, no lead/lag. */}
+        <div
+          ref={sentinelRef}
+          aria-hidden
+          className="pointer-events-none absolute -top-px left-0 h-px w-px"
+        />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            {isEditing ? (
+              <>
+                <Input
+                  id="name"
+                  {...register("name")}
+                  aria-invalid={shouldShowError("name") && !!errors.name}
+                  placeholder="Sense títol · ex: App version adoption — weekly"
+                  className={cn(
+                    "h-auto min-w-0 flex-1 border-0 bg-transparent px-0 font-semibold text-zinc-900 placeholder:font-normal placeholder:text-zinc-400 shadow-none transition-[font-size] duration-150 focus-visible:ring-0",
+                    stuck ? "text-base" : "text-2xl"
+                  )}
+                />
+                <FieldHint text={FIELD_HELP.name} label="Brief Name" />
+              </>
+            ) : (
+              <>
+                <h1
+                  className={cn(
+                    "min-w-0 truncate font-semibold text-zinc-900 transition-[font-size] duration-150",
+                    stuck ? "text-base" : "text-2xl"
+                  )}
+                >
+                  {brief.name}
+                </h1>
+                {!isCreate && (
+                  <PublishedBadge
+                    published={brief.published}
+                    className="shrink-0"
+                  />
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {actionButtons}
+            {isEditing && (
+              <DryRunButton
+                mode="form"
+                getBrief={() => getValues() as Brief}
+                disabled={!isValid}
+                filename={isCreate ? undefined : props.filename}
+              />
+            )}
+            {props.briefActions}
+          </div>
         </div>
+        {shouldShowError("name") && (
+          <FieldError message={errors.name?.message} />
+        )}
         {validityHint}
       </div>
 
-      <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Identification
-        </h2>
-        <div>
-          <LabelRow
-            htmlFor="name"
-            hint={{ text: FIELD_HELP.name, label: "Brief Name" }}
-            required
-          >
-            Brief Name
-          </LabelRow>
-          {isEditing ? (
-            <Input
-              id="name"
-              {...register("name")}
-              aria-invalid={shouldShowError("name") && !!errors.name}
-              placeholder="Ex: App version adoption — weekly"
-            />
-          ) : (
-            <ReadonlyValue>{brief.name}</ReadonlyValue>
-          )}
-          {shouldShowError("name") && (
-            <FieldError message={errors.name?.message} />
-          )}
-        </div>
-      </section>
+      {props.metadataSlot && <div>{props.metadataSlot}</div>}
 
       <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
@@ -970,21 +1028,6 @@ export function BriefForm(props: Props) {
           )}
         </div>
       </section>
-
-      <div className="border-t border-zinc-200 pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">{actionButtons}</div>
-          {isEditing && (
-            <DryRunButton
-              mode="form"
-              getBrief={() => getValues() as Brief}
-              disabled={!isValid}
-              filename={isCreate ? undefined : props.filename}
-            />
-          )}
-        </div>
-        {validityHint}
-      </div>
 
       {!isCreate && mode === "view" && (
         <div className="flex justify-end pt-2">
