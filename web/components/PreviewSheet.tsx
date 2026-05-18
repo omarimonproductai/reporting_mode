@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, GripVertical, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { PreviewTable } from "@/components/PreviewTable";
+import { SheetResizeHandle } from "@/components/SheetResizeHandle";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,19 +101,7 @@ export function PreviewSheet({
         className="flex flex-col p-0 sm:max-w-none"
         style={{ width: `${width}px` }}
       >
-        <div
-          {...handleProps}
-          aria-hidden
-          // [&_svg]:pointer-events-none — without this, the inner
-          // GripVertical SVG intercepts pointerdown before the
-          // wrapper's listener fires (lucide icons default to
-          // pointer-events: auto), so the drag never starts.
-          // before:absolute … extends the hit area ~6 px beyond
-          // each visible edge so the 6 px line is easier to grab.
-          className="group absolute inset-y-0 left-0 z-30 flex w-1.5 cursor-col-resize touch-none select-none items-center justify-center transition-colors before:absolute before:-left-1.5 before:-right-1.5 before:inset-y-0 before:content-[''] hover:bg-zinc-100 [&_svg]:pointer-events-none"
-        >
-          <GripVertical className="size-3 text-zinc-300 transition-colors group-hover:text-zinc-500" />
-        </div>
+        <SheetResizeHandle {...handleProps} />
         <SheetHeader className="shrink-0 pr-12">
           <SheetTitle>
             <PreviewHeader

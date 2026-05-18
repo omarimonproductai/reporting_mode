@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
-  GripVertical,
   History as HistoryIcon,
   RefreshCw,
 } from "lucide-react";
 import { BriefMarkdown } from "@/components/BriefMarkdown";
+import { SheetResizeHandle } from "@/components/SheetResizeHandle";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -104,13 +104,7 @@ export function HistoryDrawerButton({
         className="overflow-y-auto sm:max-w-none"
         style={{ width: `${width}px` }}
       >
-        <div
-          {...handleProps}
-          aria-hidden
-          className="group absolute inset-y-0 left-0 z-30 flex w-1.5 cursor-col-resize touch-none select-none items-center justify-center transition-colors before:absolute before:-left-1.5 before:-right-1.5 before:inset-y-0 before:content-[''] hover:bg-zinc-100 [&_svg]:pointer-events-none"
-        >
-          <GripVertical className="size-3 text-zinc-300 transition-colors group-hover:text-zinc-500" />
-        </div>
+        <SheetResizeHandle {...handleProps} />
         <SheetHeader>
           <SheetTitle>{briefName}</SheetTitle>
           <SheetDescription>

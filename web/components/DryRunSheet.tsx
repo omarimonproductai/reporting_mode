@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  GripVertical,
   Loader2,
   Sparkles,
   Square,
 } from "lucide-react";
 import { BriefMarkdown } from "@/components/BriefMarkdown";
 import { PreviewTable } from "@/components/PreviewTable";
+import { SheetResizeHandle } from "@/components/SheetResizeHandle";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -230,13 +230,7 @@ export function DryRunSheet({ open, payload, filename, onClose }: Props) {
         className="flex flex-col sm:max-w-none"
         style={{ width: `${width}px` }}
       >
-        <div
-          {...handleProps}
-          aria-hidden
-          className="group absolute inset-y-0 left-0 z-30 flex w-1.5 cursor-col-resize touch-none select-none items-center justify-center transition-colors before:absolute before:-left-1.5 before:-right-1.5 before:inset-y-0 before:content-[''] hover:bg-zinc-100 [&_svg]:pointer-events-none"
-        >
-          <GripVertical className="size-3 text-zinc-300 transition-colors group-hover:text-zinc-500" />
-        </div>
+        <SheetResizeHandle {...handleProps} />
         <SheetHeader className="shrink-0 pr-12">
           <SheetTitle className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-2 text-base font-medium">

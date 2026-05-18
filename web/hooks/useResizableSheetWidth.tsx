@@ -53,8 +53,16 @@ export function useResizableSheetWidth(): {
   // duration of the drag, so move/up events route to the handle
   // regardless of cursor position. This was the fix in PreviewSheet's
   // commit dcb64d0 — kept here verbatim.
+  //
+  // stopPropagation is also necessary: shadcn's Sheet wraps a Radix
+  // DismissableLayer that listens for pointerdown to detect
+  // interactions outside the Content. The handle visually sits at the
+  // very edge of the Content and Radix can mis-classify the drag as
+  // an outside interaction, dismissing the Sheet mid-resize. Stopping
+  // propagation keeps the event local to the handle.
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault();
+    e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     dragStateRef.current = { startX: e.clientX, startWidth: width };
   }
