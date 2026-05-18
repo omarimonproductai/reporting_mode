@@ -9,6 +9,7 @@ import {
   Square,
   Trash2,
 } from "lucide-react";
+import { BetaChip } from "@/components/BetaChip";
 import { BriefMarkdown } from "@/components/BriefMarkdown";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -290,6 +291,7 @@ export function PromptAssistantSheet({
               <span className="flex items-center gap-2 text-base font-medium">
                 <Bot className="size-4 text-zinc-500" />
                 Prompt Assistant
+                <BetaChip />
               </span>
               <Button
                 type="button"

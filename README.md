@@ -105,4 +105,4 @@ The active iteration is tracked in `tasks/tasks-online-brief-platform.md`. Major
 - 16.0 ✅ Publish/Unpublish briefs — Draft state gates the cron auto-dispatch; new briefs default to Draft; Run Now requires confirmation when dispatching a draft.
 - 17.0 ✅ Mode data preview — inline «Preview data» button on each BriefForm query row; right-side Sheet shows the last 10 rows of the latest successful Mode run, validating wiring before save.
 - 18.0 ✅ Dry-run output — «Preview output» from detail header, form footer or sidebar kebab streams a no-Slack, no-commit dry-run of the brief; 5-15 s end-to-end with progressive markdown rendering.
-- 19.0 ✅ Prompt Assistant — conversational AI helper inside the BriefForm for generating and refining brief prompts; GROQ-backed, persisted per-brief via localStorage.
+- 19.0 ✅ Prompt Assistant (Beta) — conversational AI helper inside the BriefForm for generating and refining brief prompts; GROQ-backed, persisted per-brief via localStorage.

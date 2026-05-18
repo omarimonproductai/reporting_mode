@@ -1,6 +1,7 @@
 "use client";
 
 import { Bot } from "lucide-react";
+import { BetaChip } from "@/components/BetaChip";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -12,6 +13,7 @@ export function PromptAssistantButton({ onClick }: Props) {
     <Button type="button" variant="outline" size="xs" onClick={onClick}>
       <Bot />
       Prompt Assistant
+      <BetaChip className="ml-0.5" />
     </Button>
   );
 }
