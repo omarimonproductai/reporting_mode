@@ -934,7 +934,7 @@ Implementation plan derived from `tasks/prd-online-brief-platform.md`.
     - After this, all four right-side Sheets share `right-sheet:width` — resizing one Sheet's width updates the localStorage entry, and the next time any Sheet (same or different) opens, it reads the same persisted width.
     - Sanity: verify that the existing close button (top-3 right-3 on every SheetContent) doesn't visually clash with the new handle (which is on the LEFT edge — no overlap by construction).
 
-  - [ ] 20.11 Docs sync — README + roadmap.
+  - [x] 20.11 Docs sync — README + roadmap.
     - **README Customization section** (or a new bullet): «Right-side panels (Mode preview, Dry-run, Prompt Assistant, History drawer) share a single user-resizable width persisted in `localStorage:right-sheet:width`. Defaults: min 480 px / default 672 px / max 1400 px. Re-tune by editing the constants at the top of `web/hooks/useResizableSheetWidth.tsx`.»
     - **README roadmap**: append «20.0 ⏳ Prompt-design tooling polish — Beta marker on Prompt Assistant + raw-mode handling for dry-run + shared resizable right-side Sheets + empty-prompt CSV gate + Preview chrome rename.». Flip to ✅ at merge time.
     - **README Vercel skip-build note (PD10)**: optional — only if not already documented elsewhere. One-liner: «Vercel «Ignored Build Step» runs `git diff --quiet HEAD^ HEAD ':(exclude)briefs/*.yml' && exit 0 || exit 1` so brief-YAML-only changes don't trigger production deploys.»

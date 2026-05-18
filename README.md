@@ -61,6 +61,19 @@ with the rest of the app.
   sites import the same helper, so changing the file re-calibrates
   the whole app.
 
+- **Right-side panels resize** — Mode preview, Dry-run Preview, Prompt
+  Assistant and History drawer all expose a draggable resize handle on
+  their left edge. The user-chosen width is shared across all four
+  Sheets via `localStorage:right-sheet:width`. Defaults: min `480 px`
+  / default `672 px` / max `1400 px`. Re-tune by editing the constants
+  at the top of `web/hooks/useResizableSheetWidth.tsx`.
+
+- **Vercel skip-build script** — the project's «Ignored Build Step» on
+  Vercel runs `git diff --quiet HEAD^ HEAD ':(exclude)briefs/*.yml' && exit 0 || exit 1`
+  so brief-YAML-only commits (created via the web app or pushed by an
+  operator) don't trigger a production deploy. Changing files outside
+  `briefs/` still builds normally.
+
 ## Running a brief manually
 
 From the GitHub UI:
@@ -106,3 +119,4 @@ The active iteration is tracked in `tasks/tasks-online-brief-platform.md`. Major
 - 17.0 ✅ Mode data preview — inline «Preview data» button on each BriefForm query row; right-side Sheet shows the last 10 rows of the latest successful Mode run, validating wiring before save.
 - 18.0 ✅ Dry-run output — «Preview output» from detail header, form footer or sidebar kebab streams a no-Slack, no-commit dry-run of the brief; 5-15 s end-to-end with progressive markdown rendering.
 - 19.0 ✅ Prompt Assistant (Beta) — conversational AI helper inside the BriefForm for generating and refining brief prompts; GROQ-backed, persisted per-brief via localStorage.
+- 20.0 ⏳ Prompt-design tooling polish — raw-mode handling for dry-run (no GROQ call when prompt is empty), empty-prompt CSV gate, «Preview» chrome rename + kebab reorder, and a shared resizable width across all four right-side Sheets.
