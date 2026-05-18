@@ -1,5 +1,5 @@
 name: VLTs
-published: true
+published: false
 schedule: 0 10 * * *
 slack_channel: testing-canal-nou-eliminar
 sources:
