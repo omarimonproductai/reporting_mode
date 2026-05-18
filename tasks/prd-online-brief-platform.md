@@ -427,6 +427,50 @@ A12. **No PR comment / no commit**: the assistant never edits files, never commi
 
 (Implementation tracked as **task 19.0** — currently deferred until prioritised. Decisions recorded with user 2026-05-17: 1.B GROQ Llama 3.3 70b (reuse existing key), 2.B localStorage per brief (`prompt-assistant:<filename>`), 3.* metadata + few-shot (selected on best-UX grounds: real-data context adds 3-10 s latency that kills chat feel), 4.A Sheet right-side toggle from within the BriefForm.)
 
+### Prompt-design tooling polish & raw-mode handling (added 2026-05-18, task 20.0)
+
+The three prompt-design tooling features (17.0 Mode data preview, 18.0 Dry-run output, 19.0 Prompt Assistant) shipped with an accumulated polish-debt and a real bug in the dry-run path when the brief is in raw mode (empty prompt — a capability added by PR #69 «optional prompt → raw mode»). This subsection bundles the polish and closes that loop before further features land on top of the same area.
+
+Three intertwined themes:
+1. **Raw-mode handling** — the dry-run endpoint calls GROQ with an empty system prompt, generating phantom text from the data alone. The fix is to replicate the «no LLM call» logic that `scripts/executor.py:540-545` already implements for production.
+2. **Empty-prompt validations** — a brief with no prompt requires at least one query with `csv: true` (otherwise the Slack post is empty); the Save action must be gated and the Preview must contextualise the raw-mode state.
+3. **Right-side Sheets coherence** — the four right-side Sheets (Mode preview, History drawer, Prompt Assistant, Dry-run Preview) have slightly different resize behaviours and toolbar hierarchies; we unify them.
+
+PD1. **«Preview output» renames to «Preview»** across every chrome surface: detail-page header, BriefForm footer (edit mode), sidebar kebab menu item. Pragmatic motivation: «Preview output» is long enough that the row `[Cancel] [Save] · [Publish] [Preview output] [Run Now] [History]` wraps to two lines at the detail-page header in edit mode (issue D from the polish review). «Preview» — a single word — fits. Semantically it stays unambiguous: the word was over-descriptive. This is one of the rare cases where we rename a chrome label after ship; documented here.
+
+PD2. **Sidebar kebab — menu reorder**. The current order («Edit / Run Now / History / Preview output / Publish») places Preview second-to-last, misaligned with its actual use frequency (Preview is the second most common action after Edit). New order: **Edit · Preview · Run Now · History · Publish/Unpublish**. Icons and per-item logic stay unchanged.
+
+PD3. **BriefForm action-row — single-line layout in edit mode**. After PD1, the top-of-form action row holds, in one line: `[Cancel] [Save]` (left) · `[Publish/Unpublish] [Preview] [Run Now] [History]` (right). The two-row wrap that surfaced before PD1 disappears. The wrapping container keeps `flex-wrap` as a safety net for sub-`sm` breakpoints (even though the project is desktop-only per §5).
+
+PD4. **Save gate: «empty prompt requires at least one CSV-enabled query»**. When `brief.prompt.trim() === ""` AND `brief.sources.every(s => s.queries.every(q => !q.csv))`, Save (or Create) MUST be disabled with a Catalan hint surfaced below the action row: «Sense prompt, almenys una query ha de tenir CSV activat per tenir contingut a publicar a Slack.» The validation lives in the zod schema as a `.superRefine()`; the error attaches to the brief root (cross-field), surfaced through the existing `validityHint` line in BriefForm. This is a **blocking** gate (the same level as the other required-fields validations) — not a soft toast.
+
+PD5. **Dry-run BUG fix — raw-mode handling**. `/api/briefs/dry-run` MUST detect `brief.prompt.trim() === ""` server-side and emit `raw-mode-data` events (one per query) instead of calling GROQ. Event shape:
+```ts
+{ kind: "raw-mode-data", queryName: string, reportTitle: string, columns: string[], rows: object[], total_rows: number }
+```
+After all `raw-mode-data` events the server emits a `complete` event with `{ usage: null }` (no tokens — the field is nullable on the wire). The client (DryRunSheet) detects the first raw-mode event and transitions its state machine to the new `"raw-mode"` status. **No change to `executor.py`** — the production raw-mode logic has been correct since PR #69; only the Vercel-side dry-run path needs the parallel branch.
+
+PD6. **DryRunSheet raw-mode UI**. When the first event is `raw-mode-data` (instead of `mode-fetched` or `groq-chunk`), the Sheet MUST render:
+- **Info Alert at the top of the body**: «Aquest brief està en raw mode (sense prompt). No s'invoca cap LLM. Aquesta és la previsualització de què s'enviarà a Slack.»
+- **Slack message mock**: a block reproducing exactly what the production executor would publish. Header line in font-mono: `📎 <Brief Name> — DD/MM/YYYY — volcat de dades` (identical to `executor.py:379`). Below it, a small list `N CSV attachments` with one item per query showing its estimated filename (`<query_slug>.csv`).
+- **Per-query data preview**: for each query, a block with the query name + source report as header + a `PreviewTable` (the component reused from 17.0) showing up to **10 rows** + a footer «Showing 10 of N rows» when total > 10.
+- **No token usage** at the foot (no LLM call happened).
+- **No Cancel button** (raw mode doesn't stream GROQ; the Mode fetch is still cancellable via Sheet close as in the standard path).
+
+PD7. **Empty-prompt + Preview triggers — uniform behaviour**. The three «Preview» triggers (detail header / form footer in edit / sidebar kebab) MUST stay **always enabled** regardless of whether the prompt is empty. The raw-mode detection is server-side inside `/api/briefs/dry-run` (PD5), not a client-side gate. Justification: the user may legitimately use Preview to validate what they'd see in Slack under raw mode; disabling the trigger would be counter-intuitive. No prior visual signal on the kebab — the context surfaces inside the Sheet when it opens (user decision recorded 2026-05-18).
+
+PD8. **PreviewSheet resize handle — bug fix (17.0 regression)**. The visual handle (`GripVertical` at `inset-y-0 left-0` with pointer-capture) appears but drag is unresponsive (issue F from the polish review). Most likely root cause: the `GripVertical` SVG inside the handle div intercepts the `pointerdown` event before it reaches the parent listener (lucide icons are interactive by default). Fix: apply `[&_svg]:pointer-events-none` to the handle wrapper so the SVG no longer captures pointer events, and widen the visual handle to 6 px while extending the hit-test area to ~16 px via a `::before` pseudo-element (`before:absolute before:-left-1.5 before:-right-1.5 before:inset-y-0`). The drag remains discoverable but easier to grab.
+
+PD9. **Resize handle applied to every right-side Sheet**. PromptAssistantSheet, DryRunSheet, HistoryDrawerButton and PreviewSheet MUST all expose the same resize affordance. Implementation via a shared `useResizableSheetWidth()` hook (see §7). Thresholds (matching the existing PreviewSheet values):
+- `MIN_WIDTH = 480`
+- `MAX_WIDTH = 1400`
+- `DEFAULT_WIDTH = 672`
+- LocalStorage key **shared** across all four Sheets: `right-sheet:width`. Resizing one re-calibrates all the others on the next open — coherent visual rhythm as the user alternates Sheets within a session (user decision recorded 2026-05-18: a single shared width, not per-Sheet).
+
+PD10. **Vercel build skip — yellow setting**. The project's «Ignored Build Step» (`git diff --quiet HEAD^ HEAD ':(exclude)briefs/*.yml' && exit 0 || exit 1`) is currently flagged yellow because the Production deployment still runs the previous configuration (build always). Action: the new setting applies on the next Production deploy automatically. **No code change required**, just document the expected behaviour in README («Vercel skip-build script — production deploy is skipped when only `briefs/*.yml` files have changed»). If an operator wants to force-sync, a manual redeploy from the Vercel UI does it.
+
+(Implementation tracked as **task 20.0** — pre-prioritised, in flight on branch `claude/prompt-design-tooling-rcLIR`. Decisions recorded with user 2026-05-18: 1.B resize handle present but drag broken, 2.A shared `right-sheet:width` localStorage key, 3 no kebab visual signal for raw-mode briefs, 4 Slack-mock + per-query 10-row tables for the raw-mode DryRunSheet body.)
+
 ## 5. Non-Goals (Out of Scope)
 
 - ~~**Authentication and per-user briefs**. The platform is openly accessible; everyone sees and edits everything. The data model includes a nullable `owner_email` field reserved for a future auth phase but it is never populated in this version.~~ **SUPERSEDED 2026-05-16 by §4 «Authentication & Access Control»**: authentication is now required (magic-link, domain-restricted to `@cooltra.com` / `@felyx.com`), and `owner_email` is now populated on every brief. **Per-user data isolation remains out of scope**: every authenticated user still sees and edits every brief; `owner_email` is captured but does not gate any action.
@@ -483,6 +527,7 @@ A12. **No PR comment / no commit**: the assistant never edits files, never commi
 - **"Bot not in channel" warning**: renders below the channel field as a shadcn/ui `Alert` (warning variant — yellow/amber, not red, because the situation is recoverable). Inside: one line of explanation + a code block with the `/invite` snippet + a small "Copy" button that triggers a transient "Copiat!" toast. A subtle "Refresh channels" link to re-query the list after the user invites the bot.
 - **Calendar event color**: derive deterministically from the brief name (so each brief has a consistent color across the calendar regardless of who sees it).
 - **Footer**: 12px text, `text-zinc-400`, fixed bottom-right corner with `padding 8px 12px`. Format: `Built from <sha7> · <commit subject truncated to 50 chars> · <DD/MM/YYYY HH:MM Madrid>`.
+- **Right-side Sheets — shared resizable width** (added 2026-05-18 with task 20.0): the four right-side Sheets (Mode preview from 17.0, Dry-run Preview from 18.0, Prompt Assistant from 19.0, History drawer from 12.0) all expose a draggable resize handle on their left edge and share a single persisted width in `localStorage:right-sheet:width`. Defaults: `min 480 px`, `default 672 px`, `max 1400 px`. Resizing one Sheet re-calibrates all the others on the next open so the user has a coherent visual rhythm when alternating between them within a session.
 
 ## 7. Technical Considerations
 
@@ -628,6 +673,19 @@ A12. **No PR comment / no commit**: the assistant never edits files, never commi
 - **localStorage key + schema**: `prompt-assistant:<filename>` stores `{ version: 1; messages: ChatMessage[]; updatedAt: ISO8601 }`. The `version` field future-proofs the format — if a future revision changes the message shape, the client can detect and migrate or wipe. 50-message cap enforced on every save (shift the front when over).
 - **Why no PRD edit by the assistant**: A12 makes this explicit. The assistant is a *writing aid*, not an *editor*. It proposes text; the user applies it explicitly via the button; the form's standard Save flow does the GitHub commit. No magic side-effects.
 - **Why the chat is per-brief, not global**: a user iterating Brief A and then Brief B has totally different contexts (different sources, different goals). Sharing a single chat history would muddle the LLM's understanding. Per-brief keying isolates the conversations cleanly at the cost of «I had a clever trick on Brief A and want to repeat it on Brief B» — acceptable; the user copy-pastes manually.
+
+### Prompt-design tooling polish & raw-mode handling
+
+- **`/api/briefs/dry-run` raw-mode branch** (`web/app/api/briefs/dry-run/route.ts`): after the zod parse, before calling `runDryRun`, check `brief.prompt.trim() === ""`. When empty, switch to an alternative generator `runRawModeDryRun(brief, signal)` that reuses `fetchAllSources()` from `dryRun.ts` (extracted as a public export) and emits `raw-mode-data` events instead of GROQ chunks. The existing SSE handler already consumes arbitrarily-typed events; only a new entry on the client state machine is needed.
+- **`dryRun.ts` minimal refactor**: `fetchAllSources()` moves from private to exported so it can be reused from the new raw-mode branch. Signature unchanged. `runDryRun` keeps its current shape (GROQ path).
+- **`useResizableSheetWidth()` hook** (`web/hooks/useResizableSheetWidth.tsx`, new): returns `{ width: number; handleProps: { onPointerDown, onPointerMove, onPointerUp } }`. Encapsulates the `MIN/MAX/DEFAULT_WIDTH` constants, the `right-sheet:width` localStorage key, and the pointer-capture drag logic that currently lives inline in `PreviewSheet.tsx`. The four right-side Sheets consume it identically. The visual handle (the GripVertical-bearing div) and the `<SheetContent style={{ width }}>` plumbing stay with the consumer — each Sheet may want subtle styling differences without touching the hook.
+- **Resize hit-area fix** (PD8): on the handle div, apply `[&_svg]:pointer-events-none` so the inner `GripVertical` SVG doesn't intercept `pointerdown` before the wrapper listener fires. Widen the visual handle from `w-3` (12 px) to `w-1.5` (6 px) but extend the hit-test 4 px beyond each edge via `before:absolute before:-left-1.5 before:-right-1.5 before:inset-y-0 before:content-['']` so the user has ~16 px of cursor area without the handle dominating the Sheet edge visually.
+- **DryRunSheet state machine** (PD6): add a `"raw-mode"` status with sub-payload `{ queries: Array<{ queryName, reportTitle, columns, rows, total_rows }> }`. Transition: first `raw-mode-data` event → status → `"raw-mode"`; subsequent `raw-mode-data` events append to `queries[]`; `complete` event (with `usage: null`) finalises but stays in `"raw-mode"` status (no `ready` transition because no streamed text exists to display).
+- **Slack message mock helper** (`web/lib/dryRunPreview.ts`, new — tiny ~30-line file): pure function `buildSlackRawModePreview(brief): { headerText: string; attachments: Array<{ filename: string }> }`. Mirrors the production logic at `executor.py:post_brief_to_slack` raw-mode branch. Filename generation reuses the slug logic from `executor.py:355-356` (`slugify_for_filename`) ported to TS — a 5-line regex-based helper.
+- **PreviewTable reuse**: the component shipped in 17.0 already accepts `{ columns, rows, total_rows }` in exactly the shape the `raw-mode-data` events emit. Zero change to PreviewTable.
+- **zod cross-field validation** (PD4): `briefSchema.superRefine((brief, ctx) => { ... })` added at the schema's top level in `web/lib/schemas.ts`. The error attaches as a root issue with a specific code (`empty-prompt-needs-csv`) so the `validityHint` rendering in BriefForm can branch on it and surface the Catalan copy. Existing per-field errors (Brief Name required, etc.) keep their current shape.
+- **«Preview» rename — chrome surfaces to touch** (PD1): `BriefRowMenu.tsx` (kebab item label + reorder per PD2), `DryRunButton.tsx` (English label), `BriefForm.tsx` (form-footer button), `app/briefs/[name]/page.tsx` (header button). No change to the endpoint, `useDryRun` hook, or DryRunSheet internals — pure chrome refactor.
+- **Single-row action layout** (PD3): the wrapping `flex flex-wrap items-center justify-between gap-3` is kept as-is (flex-wrap stays as a safety net). The fix is solely a consequence of PD1's shorter chrome — at `lg` (1024 px) and up, the new label list fits in one line.
 
 ### Execution tracking
 - Modify `scripts/executor.py` to write a JSON file `out/<brief-slug>.run.json` per execution, containing:
