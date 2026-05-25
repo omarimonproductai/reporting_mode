@@ -1,5 +1,5 @@
 name: Prompt sense taules
-published: false
+published: true
 schedule: 0 8 * * *
 slack_channel: testing-canal-nou-eliminar
 sources:
