@@ -1,0 +1,17 @@
+name: Exemple
+published: false
+schedule: 0 8 * * *
+slack_channel: testing-canal-nou-eliminar
+reference_link: http://www.fcbarcelona.cat
+sources:
+  - mode_report_token: 7b89f8a2f8d8
+    queries:
+      - token: 26601d07c6e9
+        csv: true
+      - token: 4c71991707f0
+        csv: true
+prompt: |-
+  Compta quantes files te cadascun dels CSV.
+  Respon amb el nom de l'arxiu i un número.
+  No escriguis cap preàmbul ni cap conclusió
+owner_email: null
