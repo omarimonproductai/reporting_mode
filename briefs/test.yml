@@ -1,5 +1,5 @@
 name: "MONTHLY PROGRESS: Cooltra&MaaS"
-published: true
+published: false
 schedule: 0 10 * * *
 slack_channel: test-github-oriol
 sources:
